@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { Link } from "react-router-dom";
 
 export default function Navbar() {
   const [open, setOpen] = useState(false);
@@ -10,12 +11,12 @@ export default function Navbar() {
         aria-label="Global"
       >
         <div className="flex h-16 items-center justify-between">
-          <div className="flex items-center gap-2">
+          <Link to="/" className="flex items-center gap-2">
             <div className="h-8 w-8 rounded-md oe-bg-green" />
             <span className="text-gray-200 font-semibold text-lg">
               OrderExpress
             </span>
-          </div>
+          </Link>
 
           <div className="hidden md:flex items-center gap-8">
             <a
@@ -45,18 +46,18 @@ export default function Navbar() {
           </div>
 
           <div className="hidden md:flex items-center gap-3">
-            <a
-              href="#login"
+            <Link
+              to="/login"
               className="px-3 py-2 text-sm text-gray-200 hover:text-white"
             >
-              Sign in
-            </a>
-            <a
-              href="#get-started"
+              Log in
+            </Link>
+            <Link
+              to="/signup"
               className="px-4 py-2 text-sm font-medium text-black bg-[var(--oe-green)] rounded-md hover:opacity-90 transition"
             >
-              Get started
-            </a>
+              Sign up
+            </Link>
           </div>
 
           <button
@@ -116,18 +117,18 @@ export default function Navbar() {
                 Contact
               </a>
               <div className="mt-2 flex gap-2">
-                <a
-                  href="#login"
+                <Link
+                  to="/login"
                   className="flex-1 px-3 py-2 text-center text-gray-200 hover:bg-white/10 rounded"
                 >
-                  Sign in
-                </a>
-                <a
-                  href="#get-started"
+                  Log in
+                </Link>
+                <Link
+                  to="/signup"
                   className="flex-1 px-3 py-2 text-center text-black bg-[var(--oe-green)] rounded hover:opacity-90"
                 >
-                  Get started
-                </a>
+                  Sign up
+                </Link>
               </div>
             </div>
           </div>
