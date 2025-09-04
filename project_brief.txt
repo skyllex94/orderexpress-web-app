@@ -10,7 +10,7 @@ ________________________________________
 🛠 Tech Stack
 •	Frontend: React (Vite + React and TypeScript + Tailwind CSS for styling)
 •	Backend: Supabase (Auth, Database, Role-based Access)
-•	Email: Supabase Functions or external service (e.g. Resend / SendGrid, and SMS sending)
+•	Email: Supabase Functions or external service (e.g. Resend / SendGrid)
 •	Deployment: Vercel (Frontend), Supabase Cloud (Backend)
 ________________________________________
 🔑 Core Features (MVP)
