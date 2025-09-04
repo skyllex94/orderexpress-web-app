@@ -1,0 +1,80 @@
+📌 Project Brief – OrderExpress - Vendor Ordering & Inventory Management Platform (MVP)
+🎯 Goal
+Build a multi-user web application that allows businesses (bars, restaurants, clubs, etc.) to manage alcohol & other inventory, track stock, and send weekly order emails to vendor representatives.
+The MVP should allow:
+•	Businesses to create accounts.
+•	Admins to invite team members with role-based permissions.
+•	Staff to update inventory and add vendor details.
+•	Automatic weekly email generation to vendors.
+________________________________________
+🛠 Tech Stack
+•	Frontend: React (Vite + React and TypeScript + Tailwind CSS for styling)
+•	Backend: Supabase (Auth, Database, Role-based Access)
+•	Email: Supabase Functions or external service (e.g. Resend / SendGrid, and SMS sending)
+•	Deployment: Vercel (Frontend), Supabase Cloud (Backend)
+________________________________________
+🔑 Core Features (MVP)
+1. Authentication & Accounts
+•	User sign up / login with Supabase Auth.
+•	Email + password login (social login optional, not MVP).
+•	Business account creation (a user can create a business).
+•	Role-based access:
+o	Admin – manage users, vendors, and inventory.
+o	Manager – manage inventory and vendors but cannot remove Admins.
+o	Staff – update inventory only.
+________________________________________
+2. Business & User Management
+•	Each business has its own workspace (multi-tenant setup).
+•	Admin can invite users by email to join the business account.
+•	Role assignment on invite.
+•	Users can belong to multiple businesses (future-proofing).
+________________________________________
+3. Vendors & Reps
+•	Business users manually add vendor details (name, category, rep contact info, email, phone number).
+•	No external vendor database – everything is user-input.
+•	Vendors are tied to a business account.
+________________________________________
+4. Inventory Management
+•	Businesses can create and manage an inventory list of alcohol and other products.
+•	Fields: Item name, category, quantity in stock, price, quantity options, vendor, storage areas where available.
+•	Inventory updates by any permitted user (role-based).
+•	Simple UI for adding, editing, and deleting items, and counting inventory
+________________________________________
+5. Ordering System
+•	User will go in, and build a cart with list of all the things he needs.
+o	When finished, it will take the whole list and send it to the appropriate vendors through email and/or phone message.
+o	Quick cart builder setup with search option to search from all the alcohol.
+•	Having different Storage Area with can be created and inputting everything in there.
+•	Admin can review/edit order before sending.
+________________________________________
+📊 Database Schema (Supabase)
+Tables (initial draft):
+•	users (managed by Supabase Auth)
+•	businesses (id, name, created_by, business_created_at, business_information[],)
+•	user_business_roles (user_id, business_id, role)
+•	vendors (id, business_id, name, contact_name, email, phone_number)
+•	inventory_items (id, business_id, name, category, quantity, price, vendor_id)
+•	orders (id, business_id, vendor_id, created_at, status)
+•	order_items (order_id, inventory_item_id, quantity)
+________________________________________
+🚀 Development Roadmap (MVP)
+1.	Setup & Boilerplate
+o	React + TypeScript + Tailwind CSS
+o	Supabase connection (auth + database)
+2.	Auth & Business Setup
+o	User registration & login
+o	Business creation
+o	Invite users to business (email link, role assignment)
+3.	Vendor Management
+o	Add/edit/delete vendor reps
+o	Store contact info + email
+4.	Inventory System
+o	Add/edit/delete items
+o	Link items to vendors
+o	Track stock + reorder thresholds
+5.	Ordering & Emails
+o	Generate weekly orders to be send to vendors
+o	Send emails via Supabase function or Resend
+6.	UI Polish
+o	Clean, minimal UI for managing data
+o	Role-based UI (hide actions user isn’t allowed)
