@@ -1,7 +1,13 @@
+import type React from "react";
 import { useMemo, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { supabase } from "../services/supabase";
 
 export default function SignupPage() {
+  const navigate = useNavigate();
+  const [stage, setStage] = useState<"account" | "business">("account");
+  const [pendingUserId, setPendingUserId] = useState<string | null>(null);
+
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
   const [email, setEmail] = useState("");
@@ -21,7 +27,7 @@ export default function SignupPage() {
     return (score / 5) * 100;
   }, [password]);
 
-  async function handleSubmit(event: React.FormEvent) {
+  async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setErrorMessage(null);
     setSuccessMessage(null);
@@ -57,11 +63,8 @@ export default function SignupPage() {
         setErrorMessage(error.message);
         return;
       }
-      if (!data.session) {
-        setSuccessMessage("Check your email to verify your account.");
-      } else {
-        setSuccessMessage("Account created successfully.");
-      }
+      setPendingUserId(data.user?.id ?? null);
+      setStage("business");
     } catch (err: any) {
       setErrorMessage(err?.message ?? "Something went wrong.");
     } finally {
@@ -69,110 +72,315 @@ export default function SignupPage() {
     }
   }
 
+  // Business form state
+  const [accountType, setAccountType] = useState<"Beverage" | "Food">(
+    "Beverage"
+  );
+  const [businessName, setBusinessName] = useState("");
+  const [address1, setAddress1] = useState("");
+  const [address2, setAddress2] = useState("");
+  const [country, setCountry] = useState("United States");
+  const [stateProv, setStateProv] = useState("Alabama");
+  const [city, setCity] = useState("");
+  const [zip, setZip] = useState("");
+  const [bizSubmitting, setBizSubmitting] = useState(false);
+  const [bizError, setBizError] = useState<string | null>(null);
+
+  async function handleBusinessSubmit(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setBizError(null);
+    if (!businessName || !address1 || !city || !zip) {
+      setBizError("Please complete the required fields.");
+      return;
+    }
+    setBizSubmitting(true);
+    try {
+      const { error } = await supabase.from("businesses").insert({
+        user_id: pendingUserId,
+        name: businessName,
+        address_line1: address1,
+        address_line2: address2,
+        country,
+        state: stateProv,
+        city,
+        zip,
+        account_type: accountType,
+        owner_email: email || null,
+      });
+      if (error) {
+        setBizError(error.message);
+        return;
+      }
+      navigate("/login");
+    } catch (err: any) {
+      setBizError(err?.message ?? "Could not save business.");
+    } finally {
+      setBizSubmitting(false);
+    }
+  }
+
   return (
     <main className="oe-content-bg min-h-screen pt-28">
       <div className="mx-auto max-w-[90rem] px-4 sm:px-6 lg:px-8">
-        <div className="mx-auto max-w-2xl">
-          <h1 className="text-3xl font-semibold text-[var(--oe-black)]">
-            Create your account
-          </h1>
-          <p className="mt-2 text-gray-600">
-            Start free. No credit card required.
-          </p>
-          <form className="mt-8 space-y-6" onSubmit={handleSubmit}>
-            <div>
-              <label className="block text-sm font-medium text-gray-700">
-                First name
-              </label>
-              <input
-                value={firstName}
-                onChange={(e) => setFirstName(e.target.value)}
-                className="mt-1 w-full rounded-md bg-white px-3 py-2 text-[var(--oe-black)] shadow-sm outline-none ring-1 ring-black/10 focus:ring-black/20"
-                placeholder="Alex"
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700">
-                Last name
-              </label>
-              <input
-                value={lastName}
-                onChange={(e) => setLastName(e.target.value)}
-                className="mt-1 w-full rounded-md bg-white px-3 py-2 text-[var(--oe-black)] shadow-sm outline-none ring-1 ring-black/10 focus:ring-black/20"
-                placeholder="Doe"
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700">
-                Email
-              </label>
-              <input
-                type="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                className="mt-1 w-full rounded-md bg-white px-3 py-2 text-[var(--oe-black)] shadow-sm outline-none ring-1 ring-black/10 focus:ring-black/20"
-                placeholder="you@example.com"
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700">
-                Password
-              </label>
-              <input
-                type="password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                className="mt-1 w-full rounded-md bg-white px-3 py-2 text-[var(--oe-black)] shadow-sm outline-none ring-1 ring-black/10 focus:ring-black/20"
-                placeholder="At least 8 characters"
-              />
-              <div className="mt-2 h-2 w-full rounded bg-black/10">
-                <div
-                  className="h-2 rounded bg-[var(--oe-green)]"
-                  style={{ width: `${passwordStrengthPercent}%` }}
-                />
-              </div>
-              <p className="mt-1 text-xs text-gray-600">
-                Use 8+ characters with a mix of letters, numbers, and symbols.
-              </p>
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700">
-                Re-enter password
-              </label>
-              <input
-                type="password"
-                value={confirmPassword}
-                onChange={(e) => setConfirmPassword(e.target.value)}
-                className="mt-1 w-full rounded-md bg-white px-3 py-2 text-[var(--oe-black)] shadow-sm outline-none ring-1 ring-black/10 focus:ring-black/20"
-                placeholder="Repeat your password"
-              />
-            </div>
-
-            {errorMessage && (
-              <div className="rounded-md bg-red-500/10 px-3 py-2 text-sm text-red-700">
-                {errorMessage}
-              </div>
-            )}
-            {successMessage && (
-              <div className="rounded-md bg-[var(--oe-green)]/10 px-3 py-2 text-sm text-[var(--oe-black)]">
-                {successMessage}
-              </div>
-            )}
-
-            <button
-              type="submit"
-              disabled={isSubmitting}
-              className="w-full rounded-md bg-[var(--oe-green)] px-4 py-2 text-black font-medium hover:opacity-90 disabled:opacity-60"
+        <div className="mx-auto max-w-3xl">
+          <div className="flex gap-6 text-sm text-gray-600">
+            <span
+              className={
+                stage === "account"
+                  ? "font-semibold text-[var(--oe-black)]"
+                  : ""
+              }
             >
-              {isSubmitting ? "Creating account..." : "Sign up"}
-            </button>
-            <p className="text-center text-sm text-gray-600">
-              Already have an account?{" "}
-              <a href="/login" className="text-[var(--oe-green)]">
-                Log in
-              </a>
-            </p>
-          </form>
+              1. Create account
+            </span>
+            <span
+              className={
+                stage === "business"
+                  ? "font-semibold text-[var(--oe-black)]"
+                  : ""
+              }
+            >
+              2. Add your business
+            </span>
+          </div>
+          <div className="relative mt-4 overflow-hidden">
+            <div
+              className="flex w-[200%] transition-transform duration-500"
+              style={{
+                transform:
+                  stage === "account" ? "translateX(0)" : "translateX(-50%)",
+              }}
+            >
+              {/* Stage 1 */}
+              <div className="w-1/2 pr-4">
+                <h1 className="text-3xl font-semibold text-[var(--oe-black)]">
+                  Create your account
+                </h1>
+                <p className="mt-2 text-gray-600">
+                  Start free. No credit card required.
+                </p>
+                <form className="mt-8 space-y-6" onSubmit={handleSubmit}>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700">
+                      First name
+                    </label>
+                    <input
+                      value={firstName}
+                      onChange={(e) => setFirstName(e.target.value)}
+                      className="mt-1 w-full rounded-md bg-white px-3 py-2 text-[var(--oe-black)] shadow-sm outline-none ring-1 ring-black/10 focus:ring-black/20"
+                      placeholder="Alex"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700">
+                      Last name
+                    </label>
+                    <input
+                      value={lastName}
+                      onChange={(e) => setLastName(e.target.value)}
+                      className="mt-1 w-full rounded-md bg-white px-3 py-2 text-[var(--oe-black)] shadow-sm outline-none ring-1 ring-black/10 focus:ring-black/20"
+                      placeholder="Doe"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700">
+                      Email
+                    </label>
+                    <input
+                      type="email"
+                      value={email}
+                      onChange={(e) => setEmail(e.target.value)}
+                      className="mt-1 w-full rounded-md bg-white px-3 py-2 text-[var(--oe-black)] shadow-sm outline-none ring-1 ring-black/10 focus:ring-black/20"
+                      placeholder="you@example.com"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700">
+                      Password
+                    </label>
+                    <input
+                      type="password"
+                      value={password}
+                      onChange={(e) => setPassword(e.target.value)}
+                      className="mt-1 w-full rounded-md bg-white px-3 py-2 text-[var(--oe-black)] shadow-sm outline-none ring-1 ring-black/10 focus:ring-black/20"
+                      placeholder="At least 8 characters"
+                    />
+                    <div className="mt-2 h-2 w-full rounded bg-black/10">
+                      <div
+                        className="h-2 rounded bg-[var(--oe-green)]"
+                        style={{ width: `${passwordStrengthPercent}%` }}
+                      />
+                    </div>
+                    <p className="mt-1 text-xs text-gray-600">
+                      Use 8+ characters with a mix of letters, numbers, and
+                      symbols.
+                    </p>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700">
+                      Re-enter password
+                    </label>
+                    <input
+                      type="password"
+                      value={confirmPassword}
+                      onChange={(e) => setConfirmPassword(e.target.value)}
+                      className="mt-1 w-full rounded-md bg-white px-3 py-2 text-[var(--oe-black)] shadow-sm outline-none ring-1 ring-black/10 focus:ring-black/20"
+                      placeholder="Repeat your password"
+                    />
+                  </div>
+                  {errorMessage && (
+                    <div className="rounded-md bg-red-500/10 px-3 py-2 text-sm text-red-700">
+                      {errorMessage}
+                    </div>
+                  )}
+                  {successMessage && (
+                    <div className="rounded-md bg-[var(--oe-green)]/10 px-3 py-2 text-sm text-[var(--oe-black)]">
+                      {successMessage}
+                    </div>
+                  )}
+                  <button
+                    type="submit"
+                    disabled={isSubmitting}
+                    className="w-full rounded-md bg-[var(--oe-green)] px-4 py-2 text-black font-medium hover:opacity-90 disabled:opacity-60"
+                  >
+                    {isSubmitting ? "Creating account..." : "Continue"}
+                  </button>
+                </form>
+              </div>
+              {/* Stage 2 */}
+              <div className="w-1/2 pl-4">
+                <h2 className="text-3xl font-semibold text-[var(--oe-black)]">
+                  Add your business
+                </h2>
+                <p className="mt-2 text-gray-600">
+                  Choose the type and enter your address.
+                </p>
+                <form
+                  className="mt-8 space-y-4"
+                  onSubmit={handleBusinessSubmit}
+                >
+                  <div className="flex items-center gap-6 text-sm">
+                    <label className="inline-flex items-center gap-2">
+                      <input
+                        type="radio"
+                        className="accent-[var(--oe-green)]"
+                        checked={accountType === "Beverage"}
+                        onChange={() => setAccountType("Beverage")}
+                      />
+                      <span>Beverage</span>
+                    </label>
+                    <label className="inline-flex items-center gap-2">
+                      <input
+                        type="radio"
+                        className="accent-[var(--oe-green)]"
+                        checked={accountType === "Food"}
+                        onChange={() => setAccountType("Food")}
+                      />
+                      <span>Food</span>
+                    </label>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700">
+                      Establishment name
+                    </label>
+                    <input
+                      value={businessName}
+                      onChange={(e) => setBusinessName(e.target.value)}
+                      className="mt-1 w-full rounded-md bg-white px-3 py-2 text-[var(--oe-black)] shadow-sm outline-none ring-1 ring-black/10 focus:ring-black/20"
+                      placeholder="Your restaurant"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700">
+                      Address line 1
+                    </label>
+                    <input
+                      value={address1}
+                      onChange={(e) => setAddress1(e.target.value)}
+                      className="mt-1 w-full rounded-md bg-white px-3 py-2 text-[var(--oe-black)] shadow-sm outline-none ring-1 ring-black/10 focus:ring-black/20"
+                      placeholder="123 Main St"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700">
+                      Address line 2
+                    </label>
+                    <input
+                      value={address2}
+                      onChange={(e) => setAddress2(e.target.value)}
+                      className="mt-1 w-full rounded-md bg-white px-3 py-2 text-[var(--oe-black)] shadow-sm outline-none ring-1 ring-black/10 focus:ring-black/20"
+                      placeholder="Suite, floor, unit (optional)"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700">
+                      Country
+                    </label>
+                    <select
+                      value={country}
+                      onChange={(e) => setCountry(e.target.value)}
+                      className="mt-1 w-full rounded-md bg-white px-3 py-2 text-[var(--oe-black)] shadow-sm ring-1 ring-black/10 focus:ring-black/20"
+                    >
+                      <option>United States</option>
+                      <option>Canada</option>
+                    </select>
+                  </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700">
+                        State/Province
+                      </label>
+                      <select
+                        value={stateProv}
+                        onChange={(e) => setStateProv(e.target.value)}
+                        className="mt-1 w-full rounded-md bg-white px-3 py-2 text-[var(--oe-black)] shadow-sm ring-1 ring-black/10 focus:ring-black/20"
+                      >
+                        <option>Alabama</option>
+                        <option>California</option>
+                        <option>New York</option>
+                        <option>Texas</option>
+                        <option>Ontario</option>
+                      </select>
+                    </div>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700">
+                          City
+                        </label>
+                        <input
+                          value={city}
+                          onChange={(e) => setCity(e.target.value)}
+                          className="mt-1 w-full rounded-md bg-white px-3 py-2 text-[var(--oe-black)] shadow-sm outline-none ring-1 ring-black/10 focus:ring-black/20"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700">
+                          Zip Code
+                        </label>
+                        <input
+                          value={zip}
+                          onChange={(e) => setZip(e.target.value)}
+                          className="mt-1 w-full rounded-md bg-white px-3 py-2 text-[var(--oe-black)] shadow-sm outline-none ring-1 ring-black/10 focus:ring-black/20"
+                        />
+                      </div>
+                    </div>
+                  </div>
+                  {bizError && (
+                    <div className="rounded-md bg-red-500/10 px-3 py-2 text-sm text-red-700">
+                      {bizError}
+                    </div>
+                  )}
+                  <button
+                    type="submit"
+                    disabled={bizSubmitting}
+                    className="w-full rounded-md bg-[var(--oe-green)] px-4 py-2 text-black font-medium hover:opacity-90 disabled:opacity-60"
+                  >
+                    {bizSubmitting ? "Saving..." : "Continue"}
+                  </button>
+                </form>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
     </main>
