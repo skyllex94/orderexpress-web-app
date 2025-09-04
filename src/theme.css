@@ -1,7 +1,8 @@
 :root {
   --oe-black: #0b0b0c;
   --oe-white: #ffffff;
-  --oe-green: #2bf56a; /* even more vibrant green */
+  --oe-green: #35d96b; /* vibrant with a hint of yellow */
+  --oe-ink: #111214; /* slightly lighter than black for nav */
 
   --oe-muted: #9aa3af;
   --oe-card: #111214;
@@ -13,7 +14,8 @@
   :root {
     --oe-black: #0b0b0c;
     --oe-white: #ffffff;
-    --oe-green: #2bf56a;
+    --oe-green: #35d96b;
+    --oe-ink: #111214;
 
     --oe-muted: #4b5563;
     --oe-card: #ffffff; /* cards slightly brighter than content */

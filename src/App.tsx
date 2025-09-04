@@ -8,24 +8,23 @@ function App() {
       <main>
         {/* Hero */}
         <section className="pt-28 sm:pt-32">
-          <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+          <div className="mx-auto max-w-[90rem] px-4 sm:px-6 lg:px-8">
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-10 items-center">
               <div>
                 <h1 className="text-4xl sm:text-5xl lg:text-6xl font-bold tracking-tight text-[var(--oe-black)]">
-                  <span className="text-[var(--oe-green)]">OrderExpress</span> —
-                  The Restaurant Management Platform
+                  Vendor Ordering Made Easy
                 </h1>
                 <p className="mt-4 text-gray-700 text-lg leading-relaxed">
-                  Streamline how you capture, track, and fulfill orders in
-                  real-time. Spend less time juggling tools and more time
-                  serving customers.
+                  Run a smooth back of the house ordering, inventory tracking
+                  and real‑time insights. Reduce manual work, prevent stockouts,
+                  and keep every order moving.
                 </p>
                 <div className="mt-8 flex flex-col sm:flex-row gap-3">
                   <a
                     href="#get-started"
                     className="inline-flex items-center justify-center px-5 py-3 rounded-md text-black bg-[var(--oe-green)] font-medium hover:opacity-90 transition"
                   >
-                    Get started free
+                    Get started for Free
                   </a>
                   <a
                     href="#demo"
@@ -49,7 +48,7 @@ function App() {
 
         {/* Logos / Social proof */}
         <section className="mt-16 sm:mt-24">
-          <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+          <div className="mx-auto max-w-[90rem] px-4 sm:px-6 lg:px-8">
             <p className="text-center text-sm text-gray-500">
               Trusted by fast-moving teams
             </p>
@@ -62,13 +61,62 @@ function App() {
         </section>
 
         {/* Features */}
+        {/* Stats inspired by BevSpot */}
+        <section className="mt-12 sm:mt-20">
+          <div className="mx-auto max-w-[90rem] px-4 sm:px-6 lg:px-8">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-6 text-center">
+              <div>
+                <div className="text-4xl font-bold text-[var(--oe-black)]">
+                  70%
+                </div>
+                <p className="mt-1 text-gray-600">
+                  reduction in time spent on inventory
+                </p>
+              </div>
+              <div>
+                <div className="text-4xl font-bold text-[var(--oe-black)]">
+                  50%
+                </div>
+                <p className="mt-1 text-gray-600">
+                  less sitting inventory on average
+                </p>
+              </div>
+              <div>
+                <div className="text-4xl font-bold text-[var(--oe-black)]">
+                  1 place
+                </div>
+                <p className="mt-1 text-gray-600">
+                  to manage multiple locations
+                </p>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        {/* Integrations inspired by BevSpot */}
+        <section className="mt-12 sm:mt-20">
+          <div className="mx-auto max-w-[90rem] px-4 sm:px-6 lg:px-8">
+            <h3 className="text-center text-xl font-semibold text-[var(--oe-black)]">
+              Integrations
+            </h3>
+            <p className="mt-2 text-center text-sm text-gray-600">
+              Connect OrderExpress to your POS and back-office tools.
+            </p>
+            <div className="mt-6 grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-4">
+              {Array.from({ length: 8 }).map((_, i) => (
+                <div key={i} className="h-12 rounded bg-black/5" />
+              ))}
+            </div>
+          </div>
+        </section>
+
         <section id="features" className="mt-20 sm:mt-28">
-          <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+          <div className="mx-auto max-w-[90rem] px-4 sm:px-6 lg:px-8">
             <div className="max-w-2xl">
               <h2 className="text-3xl sm:text-4xl font-semibold">
                 Everything you need to move fast
               </h2>
-              <p className="mt-3 text-gray-700">
+              <p className="mt-3 text-gray-600">
                 Designed for speed, accuracy, and clarity across your order
                 lifecycle.
               </p>
@@ -92,10 +140,7 @@ function App() {
                   desc: "Count stock fast, auto-generate purchase orders, and track deliveries.",
                 },
               ].map((f) => (
-                <div
-                  key={f.title}
-                  className="rounded-xl bg-[var(--oe-card)] p-6"
-                >
+                <div key={f.title} className="rounded-xl bg-[(-oe-muted)] p-6">
                   <div className="h-10 w-10 rounded-md bg-[var(--oe-green)]/20 flex items-center justify-center">
                     <div className="h-4 w-4 rounded bg-[var(--oe-green)]" />
                   </div>

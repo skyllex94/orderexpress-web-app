@@ -4,15 +4,15 @@ export default function Navbar() {
   const [open, setOpen] = useState(false);
 
   return (
-    <header className="fixed inset-x-0 top-0 z-50 backdrop-blur bg-[var(--oe-black)]/70">
+    <header className="fixed inset-x-0 top-0 z-50 bg-[var(--oe-ink)]">
       <nav
-        className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8"
+        className="mx-auto max-w-[90rem] px-4 sm:px-6 lg:px-8"
         aria-label="Global"
       >
         <div className="flex h-16 items-center justify-between">
           <div className="flex items-center gap-2">
             <div className="h-8 w-8 rounded-md oe-bg-green" />
-            <span className="text-white font-semibold text-lg">
+            <span className="text-gray-200 font-semibold text-lg">
               OrderExpress
             </span>
           </div>

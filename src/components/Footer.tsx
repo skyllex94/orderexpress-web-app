@@ -3,7 +3,7 @@ export default function Footer() {
     <footer className="mt-24 bg-[var(--oe-black)] text-white">
       {/* Pre-footer callout */}
       <div className="border-t border-[color:var(--oe-border)] bg-black/60">
-        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+        <div className="mx-auto max-w-[90rem] px-4 sm:px-6 lg:px-8">
           <div className="py-5 text-center text-sm text-gray-300">
             Interested in building for the OrderExpress ecosystem?{" "}
             <a
@@ -18,7 +18,7 @@ export default function Footer() {
 
       {/* Main footer */}
       <div className="border-t border-[color:var(--oe-border)]">
-        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-14">
+        <div className="mx-auto max-w-[90rem] px-4 sm:px-6 lg:px-8 py-14">
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-10">
             <div>
               <h4 className="text-sm font-semibold text-white">Products</h4>
