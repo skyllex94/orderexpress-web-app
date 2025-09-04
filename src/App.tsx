@@ -9,6 +9,7 @@ function App() {
   return (
     <div className="oe-content-bg oe-content-text min-h-screen">
       <Navbar />
+
       <main>
         <Routes>
           <Route path="/" element={<Landing />} />
