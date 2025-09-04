@@ -3,7 +3,7 @@ import Footer from "./components/Footer";
 
 function App() {
   return (
-    <div className="oe-bg oe-text min-h-screen">
+    <div className="oe-content-bg oe-content-text min-h-screen">
       <Navbar />
       <main>
         {/* Hero */}
@@ -11,13 +11,13 @@ function App() {
           <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-10 items-center">
               <div>
-                <h1 className="text-4xl sm:text-5xl lg:text-6xl font-bold tracking-tight">
-                  Run orders faster with{" "}
-                  <span className="text-[var(--oe-green)]">OrderExpress</span>
+                <h1 className="text-4xl sm:text-5xl lg:text-6xl font-bold tracking-tight text-[var(--oe-black)]">
+                  <span className="text-[var(--oe-green)]">OrderExpress</span> —
+                  The Restaurant Management Platform
                 </h1>
-                <p className="mt-4 text-gray-300 text-lg leading-relaxed">
-                  A streamlined platform to capture, track, and fulfill orders
-                  in real-time. Spend less time juggling tools and more time
+                <p className="mt-4 text-gray-700 text-lg leading-relaxed">
+                  Streamline how you capture, track, and fulfill orders in
+                  real-time. Spend less time juggling tools and more time
                   serving customers.
                 </p>
                 <div className="mt-8 flex flex-col sm:flex-row gap-3">
@@ -29,26 +29,19 @@ function App() {
                   </a>
                   <a
                     href="#demo"
-                    className="inline-flex items-center justify-center px-5 py-3 rounded-md border border-[color:var(--oe-border)] text-white hover:bg-white/5 transition"
+                    className="inline-flex items-center justify-center px-5 py-3 rounded-md text-[var(--oe-black)] bg-black/5 hover:bg-black/10 transition"
                   >
                     View demo
                   </a>
                 </div>
-                <p className="mt-3 text-sm text-gray-400">
+                <p className="mt-3 text-sm text-gray-600">
                   No credit card required.
                 </p>
               </div>
               <div className="relative">
-                <div className="rounded-xl border border-[color:var(--oe-border)] bg-gradient-to-b from-white/5 to-transparent p-4">
-                  <div className="aspect-[16/10] w-full rounded-lg bg-[var(--oe-card)] ring-1 ring-inset ring-[color:var(--oe-border)]" />
+                <div className="rounded-xl bg-[var(--oe-card)] p-4">
+                  <div className="aspect-[16/10] w-full rounded-lg bg-[var(--oe-card)]" />
                 </div>
-                <div
-                  className="absolute -inset-x-4 -inset-y-4 -z-10 blur-3xl opacity-30"
-                  style={{
-                    background:
-                      "radial-gradient(600px circle at 0% 0%, var(--oe-green), transparent 40%)",
-                  }}
-                />
               </div>
             </div>
           </div>
@@ -57,15 +50,12 @@ function App() {
         {/* Logos / Social proof */}
         <section className="mt-16 sm:mt-24">
           <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-            <p className="text-center text-sm text-gray-400">
+            <p className="text-center text-sm text-gray-500">
               Trusted by fast-moving teams
             </p>
             <div className="mt-6 grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-6 opacity-70">
               {Array.from({ length: 6 }).map((_, i) => (
-                <div
-                  key={i}
-                  className="h-10 rounded bg-white/5 ring-1 ring-inset ring-[color:var(--oe-border)]"
-                />
+                <div key={i} className="h-10 rounded bg-black/5" />
               ))}
             </div>
           </div>
@@ -78,7 +68,7 @@ function App() {
               <h2 className="text-3xl sm:text-4xl font-semibold">
                 Everything you need to move fast
               </h2>
-              <p className="mt-3 text-gray-300">
+              <p className="mt-3 text-gray-700">
                 Designed for speed, accuracy, and clarity across your order
                 lifecycle.
               </p>
@@ -97,18 +87,22 @@ function App() {
                   title: "Actionable insights",
                   desc: "Understand bottlenecks with dashboards and daily summaries.",
                 },
+                {
+                  title: "Inventory & vendor ordering",
+                  desc: "Count stock fast, auto-generate purchase orders, and track deliveries.",
+                },
               ].map((f) => (
                 <div
                   key={f.title}
-                  className="rounded-xl border border-[color:var(--oe-border)] bg-[var(--oe-card)] p-6"
+                  className="rounded-xl bg-[var(--oe-card)] p-6"
                 >
                   <div className="h-10 w-10 rounded-md bg-[var(--oe-green)]/20 flex items-center justify-center">
                     <div className="h-4 w-4 rounded bg-[var(--oe-green)]" />
                   </div>
-                  <h3 className="mt-4 text-lg font-semibold text-white">
+                  <h3 className="mt-4 text-lg font-semibold text-[var(--oe-black)]">
                     {f.title}
                   </h3>
-                  <p className="mt-2 text-sm text-gray-300">{f.desc}</p>
+                  <p className="mt-2 text-sm text-gray-700">{f.desc}</p>
                 </div>
               ))}
             </div>
@@ -118,11 +112,11 @@ function App() {
         {/* CTA */}
         <section className="mt-20 sm:mt-28">
           <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-            <div className="rounded-2xl border border-[color:var(--oe-border)] bg-gradient-to-b from-white/5 to-transparent p-8 sm:p-10 lg:p-14 text-center">
-              <h3 className="text-2xl sm:text-3xl font-semibold">
+            <div className="p-8 sm:p-10 lg:p-14 text-center">
+              <h3 className="text-2xl sm:text-3xl font-semibold text-[var(--oe-black)]">
                 Ready to accelerate your orders?
               </h3>
-              <p className="mt-3 text-gray-300">
+              <p className="mt-3 text-gray-700">
                 Start for free and invite your team in minutes.
               </p>
               <div className="mt-6 flex flex-col sm:flex-row gap-3 justify-center">
@@ -134,7 +128,7 @@ function App() {
                 </a>
                 <a
                   href="#contact"
-                  className="px-5 py-3 rounded-md border border-[color:var(--oe-border)] text-white hover:bg-white/5"
+                  className="px-5 py-3 rounded-md text-[var(--oe-black)] bg-black/5 hover:bg-black/10"
                 >
                   Contact sales
                 </a>

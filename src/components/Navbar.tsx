@@ -4,7 +4,7 @@ export default function Navbar() {
   const [open, setOpen] = useState(false);
 
   return (
-    <header className="fixed inset-x-0 top-0 z-50 border-b border-[color:var(--oe-border)] backdrop-blur bg-black/40">
+    <header className="fixed inset-x-0 top-0 z-50 backdrop-blur bg-[var(--oe-black)]/70">
       <nav
         className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8"
         aria-label="Global"
@@ -20,25 +20,25 @@ export default function Navbar() {
           <div className="hidden md:flex items-center gap-8">
             <a
               href="#features"
-              className="text-gray-300 hover:text-white transition"
+              className="text-gray-200 hover:text-white transition"
             >
               Features
             </a>
             <a
               href="#pricing"
-              className="text-gray-300 hover:text-white transition"
+              className="text-gray-200 hover:text-white transition"
             >
               Pricing
             </a>
             <a
               href="#faq"
-              className="text-gray-300 hover:text-white transition"
+              className="text-gray-200 hover:text-white transition"
             >
               FAQ
             </a>
             <a
               href="#contact"
-              className="text-gray-300 hover:text-white transition"
+              className="text-gray-200 hover:text-white transition"
             >
               Contact
             </a>
@@ -60,7 +60,7 @@ export default function Navbar() {
           </div>
 
           <button
-            className="md:hidden inline-flex items-center justify-center rounded-md p-2 text-gray-300 hover:text-white hover:bg-white/10"
+            className="md:hidden inline-flex items-center justify-center rounded-md p-2 text-gray-200 hover:text-white hover:bg-white/10"
             onClick={() => setOpen(!open)}
             aria-label="Toggle menu"
           >
@@ -89,7 +89,7 @@ export default function Navbar() {
         </div>
 
         {open && (
-          <div className="md:hidden border-t oe-border/50">
+          <div className="md:hidden bg-[var(--oe-black)]/90">
             <div className="space-y-1 px-4 py-3">
               <a
                 href="#features"

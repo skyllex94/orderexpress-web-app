@@ -31,6 +31,12 @@ body {
   .oe-text {
     color: var(--oe-white);
   }
+  .oe-content-bg {
+    background-color: var(--oe-offwhite);
+  }
+  .oe-content-text {
+    color: var(--oe-black);
+  }
   .oe-green {
     color: var(--oe-green);
   }

@@ -1,21 +1,23 @@
 :root {
   --oe-black: #0b0b0c;
   --oe-white: #ffffff;
-  --oe-green: #22c55e; /* bright memorable green */
+  --oe-green: #2bf56a; /* even more vibrant green */
 
   --oe-muted: #9aa3af;
   --oe-card: #111214;
   --oe-border: #1f2937;
+  --oe-offwhite: #f7f7f8; /* main content background */
 }
 
 @media (prefers-color-scheme: light) {
   :root {
     --oe-black: #0b0b0c;
     --oe-white: #ffffff;
-    --oe-green: #16a34a;
+    --oe-green: #2bf56a;
 
     --oe-muted: #4b5563;
-    --oe-card: #f7f7f8;
+    --oe-card: #ffffff; /* cards slightly brighter than content */
     --oe-border: #e5e7eb;
+    --oe-offwhite: #f7f7f8;
   }
 }
