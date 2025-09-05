@@ -1,11 +1,12 @@
 import type React from "react";
 import { useMemo, useState } from "react";
-import { useNavigate } from "react-router-dom";
+// no navigation needed here; we show success screen with link
 import { supabase } from "../services/supabase";
 
 export default function SignupPage() {
-  const navigate = useNavigate();
-  const [stage, setStage] = useState<"account" | "business">("account");
+  const [stage, setStage] = useState<"account" | "business" | "success">(
+    "account"
+  );
   const [pendingUserId, setPendingUserId] = useState<string | null>(null);
 
   const [firstName, setFirstName] = useState("");
@@ -65,8 +66,10 @@ export default function SignupPage() {
       }
       setPendingUserId(data.user?.id ?? null);
       setStage("business");
-    } catch (err: any) {
-      setErrorMessage(err?.message ?? "Something went wrong.");
+    } catch (err: unknown) {
+      const message =
+        err instanceof Error ? err.message : "Something went wrong.";
+      setErrorMessage(message);
     } finally {
       setIsSubmitting(false);
     }
@@ -116,9 +119,11 @@ export default function SignupPage() {
         setBizError(error.message);
         return;
       }
-      navigate("/login");
-    } catch (err: any) {
-      setBizError(err?.message ?? "Could not save business.");
+      setStage("success");
+    } catch (err: unknown) {
+      const message =
+        err instanceof Error ? err.message : "Could not save business.";
+      setBizError(message);
     } finally {
       setBizSubmitting(false);
     }
@@ -147,17 +152,30 @@ export default function SignupPage() {
             >
               2. Add your business
             </span>
+            <span
+              className={
+                stage === "success"
+                  ? "font-semibold text-[var(--oe-black)]"
+                  : ""
+              }
+            >
+              3. Verify email
+            </span>
           </div>
           <div className="relative mt-4 overflow-hidden">
             <div
-              className="flex w-[200%] transition-transform duration-500"
+              className="flex transition-transform duration-500"
               style={{
                 transform:
-                  stage === "account" ? "translateX(0)" : "translateX(-50%)",
+                  stage === "account"
+                    ? "translateX(0%)"
+                    : stage === "business"
+                    ? "translateX(-100%)"
+                    : "translateX(-200%)",
               }}
             >
               {/* Stage 1 */}
-              <div className="w-1/2 pr-4">
+              <div className="min-w-full pr-0 sm:pr-4">
                 <h1 className="text-3xl font-semibold text-[var(--oe-black)]">
                   Create your account
                 </h1>
@@ -253,7 +271,7 @@ export default function SignupPage() {
                 </form>
               </div>
               {/* Stage 2 */}
-              <div className="w-1/2 pl-4">
+              <div className="min-w-full pl-0 sm:pl-4">
                 <h2 className="text-3xl font-semibold text-[var(--oe-black)]">
                   Add your business
                 </h2>
@@ -383,6 +401,45 @@ export default function SignupPage() {
                     {bizSubmitting ? "Saving..." : "Continue"}
                   </button>
                 </form>
+              </div>
+              {/* Stage 3: Success */}
+              <div className="min-w-full flex items-center justify-center">
+                <div className="max-w-lg text-center px-2">
+                  <div className="mx-auto mb-6 h-16 w-16 rounded-full bg-[var(--oe-green)]/20 flex items-center justify-center">
+                    <svg
+                      width="28"
+                      height="28"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2"
+                      className="text-[var(--oe-green)]"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        d="M5 13l4 4L19 7"
+                      />
+                    </svg>
+                  </div>
+                  <h3 className="text-2xl font-semibold text-[var(--oe-black)]">
+                    You're almost there
+                  </h3>
+                  <p className="mt-2 text-gray-700">
+                    We sent a verification link to{" "}
+                    <span className="font-medium">{email}</span>. Verify your
+                    email to activate your account and continue to your
+                    dashboard.
+                  </p>
+                  <div className="mt-6 flex flex-col sm:flex-row gap-3 justify-center">
+                    <a
+                      href="/login"
+                      className="px-5 py-3 rounded-md text-black bg-[var(--oe-green)] font-medium hover:opacity-90"
+                    >
+                      Go to Log in
+                    </a>
+                  </div>
+                </div>
               </div>
             </div>
           </div>
