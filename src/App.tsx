@@ -3,7 +3,9 @@ import Navbar from "./components/Navbar";
 import Footer from "./components/Footer";
 import Landing from "./pages/Landing";
 import LoginPage from "./pages/Login";
-import SignupPage from "./pages/Signup";
+import SignupPage from "./pages/Signup.tsx";
+import Dashboard from "./pages/Dashboard.tsx";
+import ProtectedRoute from "./components/ProtectedRoute.tsx";
 
 function App() {
   return (
@@ -15,6 +17,14 @@ function App() {
           <Route path="/" element={<Landing />} />
           <Route path="/login" element={<LoginPage />} />
           <Route path="/signup" element={<SignupPage />} />
+          <Route
+            path="/dashboard"
+            element={
+              <ProtectedRoute>
+                <Dashboard />
+              </ProtectedRoute>
+            }
+          />
         </Routes>
       </main>
       <div className="mt-20" />
