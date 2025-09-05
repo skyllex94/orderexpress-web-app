@@ -75,10 +75,6 @@ export default function SignupPage() {
     }
   }
 
-  // Business form state
-  const [accountType, setAccountType] = useState<"Beverage" | "Food">(
-    "Beverage"
-  );
   const [businessName, setBusinessName] = useState("");
   const [address1, setAddress1] = useState("");
   const [address2, setAddress2] = useState("");
