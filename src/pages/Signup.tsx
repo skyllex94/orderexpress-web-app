@@ -96,16 +96,21 @@ export default function SignupPage() {
     setBizSubmitting(true);
     try {
       const { error } = await supabase.from("businesses").insert({
-        user_id: pendingUserId,
-        name: businessName,
-        address_line1: address1,
-        address_line2: address2,
-        country,
-        state: stateProv,
-        city,
-        zip,
-        account_type: accountType,
-        owner_email: email || null,
+        business_name: businessName,
+        created_by: pendingUserId,
+        user_email: email || null,
+        business_address:
+          address1 +
+          " " +
+          address2 +
+          ", " +
+          city +
+          ", " +
+          stateProv +
+          ", " +
+          country +
+          ", " +
+          zip,
       });
       if (error) {
         setBizError(error.message);
