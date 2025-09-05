@@ -132,7 +132,7 @@ export default function SignupPage() {
   return (
     <main className="oe-content-bg min-h-screen pt-28">
       <div className="mx-auto max-w-[90rem] px-4 sm:px-6 lg:px-8">
-        <div className="mx-auto max-w-3xl">
+        <div className="mx-auto max-w-3xl px-36">
           <div className="flex gap-6 text-sm text-gray-600">
             <span
               className={
@@ -175,14 +175,14 @@ export default function SignupPage() {
               }}
             >
               {/* Stage 1 */}
-              <div className="min-w-full pr-0 sm:pr-4">
+              <div className="min-w-full pr-0 sm:pr-4 pt-6">
                 <h1 className="text-3xl font-semibold text-[var(--oe-black)]">
                   Create your account
                 </h1>
                 <p className="mt-2 text-gray-600">
                   Start free. No credit card required.
                 </p>
-                <form className="mt-8 space-y-6" onSubmit={handleSubmit}>
+                <form className="mt-8 space-y-3 px-2" onSubmit={handleSubmit}>
                   <div>
                     <label className="block text-sm font-medium text-gray-700">
                       First name
@@ -271,7 +271,7 @@ export default function SignupPage() {
                 </form>
               </div>
               {/* Stage 2 */}
-              <div className="min-w-full pl-0 sm:pl-4">
+              <div className="min-w-full pl-0 sm:pl-4 pt-6">
                 <h2 className="text-3xl font-semibold text-[var(--oe-black)]">
                   Add your business
                 </h2>
@@ -279,29 +279,9 @@ export default function SignupPage() {
                   Choose the type and enter your address.
                 </p>
                 <form
-                  className="mt-8 space-y-4"
+                  className="mt-8 space-y-4 px-2"
                   onSubmit={handleBusinessSubmit}
                 >
-                  <div className="flex items-center gap-6 text-sm">
-                    <label className="inline-flex items-center gap-2">
-                      <input
-                        type="radio"
-                        className="accent-[var(--oe-green)]"
-                        checked={accountType === "Beverage"}
-                        onChange={() => setAccountType("Beverage")}
-                      />
-                      <span>Beverage</span>
-                    </label>
-                    <label className="inline-flex items-center gap-2">
-                      <input
-                        type="radio"
-                        className="accent-[var(--oe-green)]"
-                        checked={accountType === "Food"}
-                        onChange={() => setAccountType("Food")}
-                      />
-                      <span>Food</span>
-                    </label>
-                  </div>
                   <div>
                     <label className="block text-sm font-medium text-gray-700">
                       Establishment name
@@ -332,7 +312,7 @@ export default function SignupPage() {
                       value={address2}
                       onChange={(e) => setAddress2(e.target.value)}
                       className="mt-1 w-full rounded-md bg-white px-3 py-2 text-[var(--oe-black)] shadow-sm outline-none ring-1 ring-black/10 focus:ring-black/20"
-                      placeholder="Suite, floor, unit (optional)"
+                      placeholder="Suite, floor, unit..."
                     />
                   </div>
                   <div>
@@ -403,7 +383,7 @@ export default function SignupPage() {
                 </form>
               </div>
               {/* Stage 3: Success */}
-              <div className="min-w-full flex items-center justify-center">
+              <div className="min-w-full flex items-center justify-center pt-6">
                 <div className="max-w-lg text-center px-2">
                   <div className="mx-auto mb-6 h-16 w-16 rounded-full bg-[var(--oe-green)]/20 flex items-center justify-center">
                     <svg
