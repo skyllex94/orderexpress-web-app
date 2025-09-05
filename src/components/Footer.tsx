@@ -1,4 +1,8 @@
+import { useLocation } from "react-router-dom";
+
 export default function Footer() {
+  const location = useLocation();
+  if (location.pathname.startsWith("/dashboard")) return null;
   return (
     <footer className="mt-24 bg-[var(--oe-black)] text-white">
       {/* Pre-footer callout */}

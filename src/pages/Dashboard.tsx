@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { supabase } from "../services/supabase";
 
 type SidebarItem = {
@@ -15,7 +16,14 @@ const items: SidebarItem[] = [
 ];
 
 export default function Dashboard() {
-  const [collapsed, setCollapsed] = useState(false);
+  const navigate = useNavigate();
+  const [collapsed, setCollapsed] = useState<boolean>(() => {
+    try {
+      return localStorage.getItem("oe_sidebar_collapsed") === "1";
+    } catch {
+      return false;
+    }
+  });
   const [active, setActive] = useState("overview");
   const [businessName, setBusinessName] = useState<string>("");
   const [loading, setLoading] = useState(true);
@@ -42,6 +50,14 @@ export default function Dashboard() {
       mounted = false;
     };
   }, []);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem("oe_sidebar_collapsed", collapsed ? "1" : "0");
+    } catch {
+      /* ignore */
+    }
+  }, [collapsed]);
 
   const Icon = ({ k, active: isActive }: { k: string; active: boolean }) => (
     <svg
@@ -127,12 +143,46 @@ export default function Dashboard() {
             </button>
           ))}
         </nav>
-        <div className="absolute bottom-0 inset-x-0 p-3 border-t border-[color:var(--oe-border)]">
+        {/* Sign out option above arrow */}
+        <div className="px-2 pb-2">
+          <button
+            onClick={async () => {
+              await supabase.auth.signOut();
+              navigate("/");
+            }}
+            className="w-full text-left flex items-center gap-3 rounded-md px-3 py-2 hover:bg-white/5 text-white/90"
+          >
+            <svg
+              className="h-4 w-4 text-gray-400"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+            >
+              <path d="M10 17l5-5-5-5" />
+              <path d="M15 12H3" />
+              <path d="M21 21V3" />
+            </svg>
+            {!collapsed && <span>Sign out</span>}
+          </button>
+        </div>
+        <div className="absolute bottom-0 inset-x-0 p-3 border-t border-[color:var(--oe-border)] flex items-center justify-end gap-2">
           <button
             onClick={() => setCollapsed(!collapsed)}
-            className="w-full rounded-md bg-white/5 hover:bg-white/10 py-2 text-sm"
+            aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
+            className="ml-auto rounded-md bg-white/5 hover:bg-white/10 p-2"
           >
-            {collapsed ? "Expand" : "Collapse"}
+            <svg
+              className={`h-4 w-4 transition-transform ${
+                collapsed ? "rotate-180" : ""
+              }`}
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+            >
+              <path d="M15 6l-6 6 6 6" />
+            </svg>
           </button>
         </div>
       </aside>
