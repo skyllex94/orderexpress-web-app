@@ -10,6 +10,12 @@ export default function Navbar() {
 
   useEffect(() => {
     let mounted = true;
+    const toTitle = (s?: string | null) =>
+      (s || "")
+        .split(/\s+/)
+        .filter(Boolean)
+        .map((w) => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase())
+        .join(" ");
     async function load() {
       const { data } = await supabase.auth.getUser();
       if (!mounted) return;
@@ -18,7 +24,9 @@ export default function Navbar() {
         | undefined;
       if (data.user) {
         const full =
-          [meta?.first_name, meta?.last_name].filter(Boolean).join(" ") ||
+          toTitle(
+            [meta?.first_name, meta?.last_name].filter(Boolean).join(" ")
+          ) ||
           data.user.email ||
           null;
         setUserName(full);
@@ -33,7 +41,9 @@ export default function Navbar() {
           | { first_name?: string; last_name?: string }
           | undefined;
         const full =
-          [meta?.first_name, meta?.last_name].filter(Boolean).join(" ") ||
+          toTitle(
+            [meta?.first_name, meta?.last_name].filter(Boolean).join(" ")
+          ) ||
           session.user.email ||
           null;
         setUserName(full);
