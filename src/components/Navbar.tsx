@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useNavigate, useLocation } from "react-router-dom";
 import { supabase } from "../services/supabase";
 
 export default function Navbar() {
@@ -7,6 +7,7 @@ export default function Navbar() {
 
   const [userName, setUserName] = useState<string | null>(null);
   const navigate = useNavigate();
+  const location = useLocation();
 
   useEffect(() => {
     let mounted = true;
@@ -56,6 +57,10 @@ export default function Navbar() {
       mounted = false;
     };
   }, []);
+
+  if (location.pathname.startsWith("/dashboard")) {
+    return null;
+  }
 
   return (
     <header className="fixed inset-x-0 top-0 z-50 bg-[var(--oe-ink)]">

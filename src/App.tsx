@@ -1,4 +1,4 @@
-import { Routes, Route, useLocation } from "react-router-dom";
+import { Routes, Route } from "react-router-dom";
 import Navbar from "./components/Navbar";
 import Footer from "./components/Footer";
 import Landing from "./pages/Landing";
@@ -8,17 +8,11 @@ import Dashboard from "./pages/Dashboard.tsx";
 import ProtectedRoute from "./components/ProtectedRoute.tsx";
 
 function App() {
-  const location = useLocation();
-  const isDashboard = location.pathname.startsWith("/dashboard");
   return (
     <div className="oe-content-bg oe-content-text min-h-screen">
-      {!isDashboard && (
-        <>
-          <Navbar />
-        </>
-      )}
+      <Navbar />
 
-      <main className={isDashboard ? "pt-0" : "pt-0"}>
+      <main>
         <Routes>
           <Route path="/" element={<Landing />} />
           <Route path="/login" element={<LoginPage />} />
@@ -33,12 +27,8 @@ function App() {
           />
         </Routes>
       </main>
-      {!isDashboard && (
-        <>
-          <div className="mt-20" />
-          <Footer />
-        </>
-      )}
+      <div className="mt-20" />
+      <Footer />
     </div>
   );
 }

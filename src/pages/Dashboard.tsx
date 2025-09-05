@@ -18,6 +18,7 @@ export default function Dashboard() {
   const [collapsed, setCollapsed] = useState(false);
   const [active, setActive] = useState("overview");
   const [businessName, setBusinessName] = useState<string>("");
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     let mounted = true;
@@ -34,6 +35,7 @@ export default function Dashboard() {
         .maybeSingle();
       if (!mounted) return;
       setBusinessName(data?.business_name || "Your Business");
+      setLoading(false);
     }
     load();
     return () => {
@@ -74,6 +76,17 @@ export default function Dashboard() {
       )}
     </svg>
   );
+
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-center">
+          <div className="mx-auto h-10 w-10 rounded-full border-2 border-white/30 border-t-[var(--oe-green)] animate-spin" />
+          <p className="mt-3 text-gray-600">Retrieving data…</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="flex min-h-screen">
