@@ -128,7 +128,7 @@ export default function SignupPage() {
   return (
     <main className="oe-content-bg min-h-screen pt-28">
       <div className="mx-auto max-w-[90rem] px-4 sm:px-6 lg:px-8">
-        <div className="mx-auto max-w-3xl px-36">
+        <div className="mx-auto max-w-3xl px-4 sm:px-6 lg:px-8">
           <div className="flex gap-6 text-sm text-gray-600">
             <span
               className={
