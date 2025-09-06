@@ -1,6 +1,12 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "../services/supabase";
+import AddBusinessModal from "../components/AddBusinessModal";
+import Overview from "./dashboard/Overview";
+import Inventory from "./dashboard/Inventory";
+import Ordering from "./dashboard/Ordering";
+import Analytics from "./dashboard/Analytics";
+import Settings from "./dashboard/Settings";
 
 type SidebarItem = {
   key: string;
@@ -30,6 +36,11 @@ export default function Dashboard() {
   >(null);
   const [businessName, setBusinessName] = useState<string>("");
   const [loading, setLoading] = useState(true);
+  const [modalOpen, setModalOpen] = useState(false);
+  const [users, setUsers] = useState<
+    { name: string; email: string; isCurrentUser: boolean }[]
+  >([]);
+  const [usersLoading, setUsersLoading] = useState(false);
 
   useEffect(() => {
     let mounted = true;
@@ -45,7 +56,7 @@ export default function Dashboard() {
         .limit(1)
         .maybeSingle();
       if (!mounted) return;
-      setBusinessName(data?.business_name || "Your Business");
+      setBusinessName(data?.business_name || "");
       setLoading(false);
     }
     load();
@@ -61,6 +72,45 @@ export default function Dashboard() {
       /* ignore */
     }
   }, [collapsed]);
+
+  // Load current user for Settings > Users
+  useEffect(() => {
+    if (active !== "settings" || settingsSection !== "users") return;
+    let mounted = true;
+    async function loadUsers() {
+      setUsersLoading(true);
+      try {
+        const { data: userResp, error } = await supabase.auth.getUser();
+        if (error) return;
+        const current = userResp.user;
+        if (!current) return;
+        const meta = (current.user_metadata ?? {}) as Record<string, unknown>;
+        const first =
+          typeof meta["first_name"] === "string"
+            ? (meta["first_name"] as string)
+            : undefined;
+        const last =
+          typeof meta["last_name"] === "string"
+            ? (meta["last_name"] as string)
+            : undefined;
+        const fullName = [first, last].filter(Boolean).join(" ") || "Owner";
+        if (!mounted) return;
+        setUsers([
+          {
+            name: fullName,
+            email: current.email || "",
+            isCurrentUser: true,
+          },
+        ]);
+      } finally {
+        if (mounted) setUsersLoading(false);
+      }
+    }
+    loadUsers();
+    return () => {
+      mounted = false;
+    };
+  }, [active, settingsSection]);
 
   const Icon = ({ k, active: isActive }: { k: string; active: boolean }) => (
     <svg
@@ -126,7 +176,9 @@ export default function Dashboard() {
               <div className="text-xs uppercase tracking-wide text-gray-400">
                 Business
               </div>
-              <div className="mt-1 font-medium truncate">{businessName}</div>
+              <div className="mt-1 font-medium truncate">
+                {businessName || "Your Business"}
+              </div>
             </>
           ) : (
             <div className="text-xs text-gray-400">Biz</div>
@@ -268,16 +320,25 @@ export default function Dashboard() {
       </aside>
       <main className="flex-1 p-6">
         <div className="mx-auto max-w-[90rem]">
-          {active !== "settings" && (
+          {active === "overview" && (
             <>
-              <h1 className="text-2xl font-semibold text-[var(--oe-black)]">
-                {items.find((i) => i.key === active)?.label}
-              </h1>
-              <p className="mt-2 text-gray-600">
-                This is the {active} section.
-              </p>
+              <Overview />
+              {!businessName && (
+                <div className="mt-4">
+                  <button
+                    onClick={() => setModalOpen(true)}
+                    className="rounded-md bg-[var(--oe-green)] px-3 py-2 text-black text-sm hover:opacity-90"
+                  >
+                    Add business
+                  </button>
+                </div>
+              )}
             </>
           )}
+          {active === "inventory" && <Inventory />}
+          {active === "ordering" && <Ordering />}
+          {active === "analytics" && <Analytics />}
+          {active === "settings" && <Settings />}
 
           {active === "settings" && (
             <div className="space-y-6">
@@ -312,68 +373,50 @@ export default function Dashboard() {
                         </tr>
                       </thead>
                       <tbody>
-                        {[
-                          {
-                            name: "Craig Montague",
-                            email: "cmontague@gmail.com",
-                            admin: true,
-                            inventory: true,
-                            ordering: false,
-                            analytics: false,
-                            access: true,
-                          },
-                          {
-                            name: "Evan Ramirez",
-                            email: "ramirez@example.com",
-                            admin: false,
-                            inventory: true,
-                            ordering: true,
-                            analytics: true,
-                            access: true,
-                          },
-                          {
-                            name: "Kamen Kanchev",
-                            email: "kkanchev@gmail.com",
-                            admin: false,
-                            inventory: false,
-                            ordering: true,
-                            analytics: false,
-                            access: true,
-                          },
-                        ].map((u) => (
-                          <tr key={u.email} className="hover:bg-black/5">
-                            <td className="px-4 py-3 whitespace-nowrap">
-                              {u.name}
-                            </td>
-                            <td className="px-4 py-3 text-gray-700 whitespace-nowrap">
-                              {u.email}
-                            </td>
-                            {[
-                              u.admin,
-                              u.inventory,
-                              u.ordering,
-                              u.analytics,
-                              u.access,
-                            ].map((val, i) => (
-                              <td key={i} className="px-4 py-3 text-center">
-                                <input
-                                  type="checkbox"
-                                  className="accent-[var(--oe-green)]"
-                                  checked={val}
-                                  readOnly
-                                />
-                              </td>
-                            ))}
-                            <td className="px-4 py-3 text-right">
-                              <button
-                                className="rounded bg-black/5 px-3 py-1 text-xs text-gray-700"
-                                disabled
-                              >
-                                Update
-                              </button>
+                        {usersLoading && (
+                          <tr>
+                            <td className="px-4 py-3 text-gray-600" colSpan={8}>
+                              Loading users…
                             </td>
                           </tr>
-                        ))}
+                        )}
+                        {!usersLoading && users.length === 0 && (
+                          <tr>
+                            <td className="px-4 py-3 text-gray-600" colSpan={8}>
+                              No users found.
+                            </td>
+                          </tr>
+                        )}
+                        {!usersLoading &&
+                          users.map((u) => (
+                            <tr key={u.email} className="hover:bg-black/5">
+                              <td className="px-4 py-3 whitespace-nowrap">
+                                {u.name}
+                              </td>
+                              <td className="px-4 py-3 text-gray-700 whitespace-nowrap">
+                                {u.email}
+                              </td>
+                              {[true, true, true, true, true].map((val, i) => (
+                                <td key={i} className="px-4 py-3 text-center">
+                                  <input
+                                    type="checkbox"
+                                    className="accent-[var(--oe-green)]"
+                                    checked={val}
+                                    disabled={u.isCurrentUser}
+                                    readOnly
+                                  />
+                                </td>
+                              ))}
+                              <td className="px-4 py-3 text-right">
+                                <button
+                                  className="rounded bg-black/5 px-3 py-1 text-xs text-gray-700"
+                                  disabled={u.isCurrentUser}
+                                >
+                                  Update
+                                </button>
+                              </td>
+                            </tr>
+                          ))}
                       </tbody>
                     </table>
                   </div>
@@ -397,6 +440,23 @@ export default function Dashboard() {
               )}
             </div>
           )}
+          <AddBusinessModal
+            isOpen={modalOpen}
+            onClose={() => setModalOpen(false)}
+            onCreated={async () => {
+              const { data: sessionData } = await supabase.auth.getSession();
+              const userId = sessionData.session?.user.id;
+              if (!userId) return;
+              const { data } = await supabase
+                .from("businesses")
+                .select("business_name")
+                .eq("created_by_user", userId)
+                .order("created_at", { ascending: true })
+                .limit(1)
+                .maybeSingle();
+              setBusinessName(data?.business_name || "");
+            }}
+          />
         </div>
       </main>
     </div>

@@ -4,10 +4,7 @@ import { useMemo, useState } from "react";
 import { supabase } from "../services/supabase";
 
 export default function SignupPage() {
-  const [stage, setStage] = useState<"account" | "business" | "success">(
-    "account"
-  );
-  const [pendingUserId, setPendingUserId] = useState<string | null>(null);
+  const [stage, setStage] = useState<"account" | "success">("account");
 
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
@@ -52,7 +49,7 @@ export default function SignupPage() {
 
     setIsSubmitting(true);
     try {
-      const { data, error } = await supabase.auth.signUp({
+      const { error } = await supabase.auth.signUp({
         email,
         password,
         options: {
@@ -64,8 +61,7 @@ export default function SignupPage() {
         setErrorMessage(error.message);
         return;
       }
-      setPendingUserId(data.user?.id ?? null);
-      setStage("business");
+      setStage("success");
     } catch (err: unknown) {
       const message =
         err instanceof Error ? err.message : "Something went wrong.";
@@ -75,55 +71,7 @@ export default function SignupPage() {
     }
   }
 
-  const [businessName, setBusinessName] = useState("");
-  const [address1, setAddress1] = useState("");
-  const [address2, setAddress2] = useState("");
-  const [country, setCountry] = useState("United States");
-  const [stateProv, setStateProv] = useState("Alabama");
-  const [city, setCity] = useState("");
-  const [zip, setZip] = useState("");
-  const [bizSubmitting, setBizSubmitting] = useState(false);
-  const [bizError, setBizError] = useState<string | null>(null);
-
-  async function handleBusinessSubmit(event: React.FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    setBizError(null);
-    if (!businessName || !address1 || !city || !zip) {
-      setBizError("Please complete the required fields.");
-      return;
-    }
-    setBizSubmitting(true);
-    try {
-      const { error } = await supabase.from("businesses").insert({
-        business_name: businessName,
-        created_by_user: pendingUserId,
-        user_email: email || null,
-        business_address:
-          address1 +
-          " " +
-          address2 +
-          ", " +
-          city +
-          ", " +
-          stateProv +
-          ", " +
-          country +
-          ", " +
-          zip,
-      });
-      if (error) {
-        setBizError(error.message);
-        return;
-      }
-      setStage("success");
-    } catch (err: unknown) {
-      const message =
-        err instanceof Error ? err.message : "Could not save business.";
-      setBizError(message);
-    } finally {
-      setBizSubmitting(false);
-    }
-  }
+  // Business creation moved to Dashboard via AddBusinessModal
 
   return (
     <main className="oe-content-bg min-h-screen pt-28">
@@ -141,21 +89,12 @@ export default function SignupPage() {
             </span>
             <span
               className={
-                stage === "business"
-                  ? "font-semibold text-[var(--oe-black)]"
-                  : ""
-              }
-            >
-              2. Add your business
-            </span>
-            <span
-              className={
                 stage === "success"
                   ? "font-semibold text-[var(--oe-black)]"
                   : ""
               }
             >
-              3. Verify email
+              2. Verify email
             </span>
           </div>
           <div className="relative mt-4 overflow-hidden">
@@ -163,11 +102,7 @@ export default function SignupPage() {
               className="flex transition-transform duration-500"
               style={{
                 transform:
-                  stage === "account"
-                    ? "translateX(0%)"
-                    : stage === "business"
-                    ? "translateX(-100%)"
-                    : "translateX(-200%)",
+                  stage === "account" ? "translateX(0%)" : "translateX(-100%)",
               }}
             >
               {/* Stage 1 */}
@@ -266,118 +201,7 @@ export default function SignupPage() {
                   </button>
                 </form>
               </div>
-              {/* Stage 2 */}
-              <div className="min-w-full pl-0 sm:pl-4 pt-6">
-                <h2 className="text-3xl font-semibold text-[var(--oe-black)]">
-                  Add your business
-                </h2>
-                <p className="mt-2 text-gray-600">
-                  Choose the type and enter your address.
-                </p>
-                <form
-                  className="mt-8 space-y-4 px-2"
-                  onSubmit={handleBusinessSubmit}
-                >
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700">
-                      Establishment name
-                    </label>
-                    <input
-                      value={businessName}
-                      onChange={(e) => setBusinessName(e.target.value)}
-                      className="mt-1 w-full rounded-md bg-white px-3 py-2 text-[var(--oe-black)] shadow-sm outline-none ring-1 ring-black/10 focus:ring-black/20"
-                      placeholder="Your restaurant"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700">
-                      Address line 1
-                    </label>
-                    <input
-                      value={address1}
-                      onChange={(e) => setAddress1(e.target.value)}
-                      className="mt-1 w-full rounded-md bg-white px-3 py-2 text-[var(--oe-black)] shadow-sm outline-none ring-1 ring-black/10 focus:ring-black/20"
-                      placeholder="123 Main St"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700">
-                      Address line 2
-                    </label>
-                    <input
-                      value={address2}
-                      onChange={(e) => setAddress2(e.target.value)}
-                      className="mt-1 w-full rounded-md bg-white px-3 py-2 text-[var(--oe-black)] shadow-sm outline-none ring-1 ring-black/10 focus:ring-black/20"
-                      placeholder="Suite, floor, unit..."
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700">
-                      Country
-                    </label>
-                    <select
-                      value={country}
-                      onChange={(e) => setCountry(e.target.value)}
-                      className="mt-1 w-full rounded-md bg-white px-3 py-2 text-[var(--oe-black)] shadow-sm ring-1 ring-black/10 focus:ring-black/20"
-                    >
-                      <option>United States</option>
-                      <option>Canada</option>
-                    </select>
-                  </div>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700">
-                        State/Province
-                      </label>
-                      <select
-                        value={stateProv}
-                        onChange={(e) => setStateProv(e.target.value)}
-                        className="mt-1 w-full rounded-md bg-white px-3 py-2 text-[var(--oe-black)] shadow-sm ring-1 ring-black/10 focus:ring-black/20"
-                      >
-                        <option>Alabama</option>
-                        <option>California</option>
-                        <option>New York</option>
-                        <option>Texas</option>
-                        <option>Ontario</option>
-                      </select>
-                    </div>
-                    <div className="grid grid-cols-2 gap-4">
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700">
-                          City
-                        </label>
-                        <input
-                          value={city}
-                          onChange={(e) => setCity(e.target.value)}
-                          className="mt-1 w-full rounded-md bg-white px-3 py-2 text-[var(--oe-black)] shadow-sm outline-none ring-1 ring-black/10 focus:ring-black/20"
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700">
-                          Zip Code
-                        </label>
-                        <input
-                          value={zip}
-                          onChange={(e) => setZip(e.target.value)}
-                          className="mt-1 w-full rounded-md bg-white px-3 py-2 text-[var(--oe-black)] shadow-sm outline-none ring-1 ring-black/10 focus:ring-black/20"
-                        />
-                      </div>
-                    </div>
-                  </div>
-                  {bizError && (
-                    <div className="rounded-md bg-red-500/10 px-3 py-2 text-sm text-red-700">
-                      {bizError}
-                    </div>
-                  )}
-                  <button
-                    type="submit"
-                    disabled={bizSubmitting}
-                    className="w-full rounded-md bg-[var(--oe-green)] px-4 py-2 text-black font-medium hover:opacity-90 disabled:opacity-60"
-                  >
-                    {bizSubmitting ? "Saving..." : "Continue"}
-                  </button>
-                </form>
-              </div>
+
               {/* Stage 3: Success */}
               <div className="min-w-full flex items-center justify-center pt-6">
                 <div className="max-w-lg text-center px-2">
