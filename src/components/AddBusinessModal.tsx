@@ -39,24 +39,40 @@ export default function AddBusinessModal({
         setErrorMessage("You must be logged in to create a business.");
         return;
       }
-      const { error } = await supabase.from("businesses").insert({
-        business_name: businessName,
-        created_by_user: userId,
-        business_address:
-          address1 +
-          " " +
-          address2 +
-          ", " +
-          city +
-          ", " +
-          stateProv +
-          ", " +
-          country +
-          ", " +
-          zip,
-      });
-      if (error) {
-        setErrorMessage(error.message);
+      const { data: biz, error: bizError } = await supabase
+        .from("businesses")
+        .insert({
+          business_name: businessName,
+          created_by_user: userId,
+          business_address:
+            address1 +
+            " " +
+            address2 +
+            ", " +
+            city +
+            ", " +
+            stateProv +
+            ", " +
+            country +
+            ", " +
+            zip,
+        })
+        .select("id")
+        .single();
+      if (bizError) {
+        setErrorMessage(bizError.message);
+        return;
+      }
+      const businessId = biz?.id as string | undefined;
+      if (!businessId) {
+        setErrorMessage("Failed to create business. Please try again.");
+        return;
+      }
+      const { error: roleError } = await supabase
+        .from("user_business_roles")
+        .insert({ user_id: userId, business_id: businessId, role: "admin" });
+      if (roleError) {
+        setErrorMessage(roleError.message);
         return;
       }
       onCreated?.();

@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "../services/supabase";
 import AddBusinessModal from "../components/AddBusinessModal";
+import InviteUserModal from "../components/InviteUserModal";
 import Overview from "./dashboard/Overview";
 import Inventory from "./dashboard/Inventory";
 import Ordering from "./dashboard/Ordering";
@@ -20,6 +21,12 @@ const items: SidebarItem[] = [
   { key: "analytics", label: "Analytics" },
 ];
 
+type Role =
+  | "admin"
+  | "inventory_manager"
+  | "ordering_manager"
+  | "sales_manager";
+
 export default function Dashboard() {
   const navigate = useNavigate();
   const [collapsed, setCollapsed] = useState<boolean>(() => {
@@ -35,10 +42,17 @@ export default function Dashboard() {
     "plan" | "users" | "account" | null
   >(null);
   const [businessName, setBusinessName] = useState<string>("");
+  const [businessId, setBusinessId] = useState<string>("");
   const [loading, setLoading] = useState(true);
   const [modalOpen, setModalOpen] = useState(false);
+  const [inviteOpen, setInviteOpen] = useState(false);
   const [users, setUsers] = useState<
-    { name: string; email: string; isCurrentUser: boolean }[]
+    {
+      name: string;
+      email: string;
+      isCurrentUser: boolean;
+      role: Role;
+    }[]
   >([]);
   const [usersLoading, setUsersLoading] = useState(false);
 
@@ -50,13 +64,14 @@ export default function Dashboard() {
       if (!userId) return;
       const { data } = await supabase
         .from("businesses")
-        .select("business_name")
+        .select("id, business_name")
         .eq("created_by_user", userId)
         .order("created_at", { ascending: true })
         .limit(1)
         .maybeSingle();
       if (!mounted) return;
       setBusinessName(data?.business_name || "");
+      setBusinessId(data?.id || "");
       setLoading(false);
     }
     load();
@@ -73,7 +88,7 @@ export default function Dashboard() {
     }
   }, [collapsed]);
 
-  // Load current user for Settings > Users
+  // Load users for current business for Settings > Users
   useEffect(() => {
     if (active !== "settings" || settingsSection !== "users") return;
     let mounted = true;
@@ -94,14 +109,46 @@ export default function Dashboard() {
             ? (meta["last_name"] as string)
             : undefined;
         const fullName = [first, last].filter(Boolean).join(" ") || "Owner";
-        if (!mounted) return;
-        setUsers([
+
+        // Start with current user as admin by default if no role row exists yet
+        const list: {
+          name: string;
+          email: string;
+          isCurrentUser: boolean;
+          role: Role;
+        }[] = [
           {
             name: fullName,
             email: current.email || "",
             isCurrentUser: true,
+            role: "admin",
           },
-        ]);
+        ];
+
+        if (businessId) {
+          const { data: roleRows } = await supabase
+            .from("user_business_roles")
+            .select("user_id, role")
+            .eq("business_id", businessId);
+          if (roleRows && Array.isArray(roleRows)) {
+            for (const row of roleRows) {
+              const isSelf = row.user_id === current.id;
+              if (isSelf) {
+                list[0].role = (row.role as Role) ?? "admin";
+                continue;
+              }
+              list.push({
+                name: "User",
+                email: "—",
+                isCurrentUser: false,
+                role: (row.role as Role) ?? "inventory_manager",
+              });
+            }
+          }
+        }
+
+        if (!mounted) return;
+        setUsers(list);
       } finally {
         if (mounted) setUsersLoading(false);
       }
@@ -110,7 +157,7 @@ export default function Dashboard() {
     return () => {
       mounted = false;
     };
-  }, [active, settingsSection]);
+  }, [active, settingsSection, businessId]);
 
   const Icon = ({ k, active: isActive }: { k: string; active: boolean }) => (
     <svg
@@ -350,7 +397,10 @@ export default function Dashboard() {
                 <div className="rounded-2xl bg-white p-6">
                   <div className="pb-4 flex items-center justify-between">
                     <h2 className="font-medium">Users</h2>
-                    <button className="rounded-md bg-[var(--oe-green)] px-3 py-2 text-black text-sm hover:opacity-90">
+                    <button
+                      onClick={() => setInviteOpen(true)}
+                      className="rounded-md bg-[var(--oe-green)] px-3 py-2 text-black text-sm hover:opacity-90"
+                    >
                       Invite user
                     </button>
                   </div>
@@ -364,11 +414,7 @@ export default function Dashboard() {
                           <th className="text-left px-4 py-2 font-medium">
                             Email
                           </th>
-                          <th className="px-4 py-2 font-medium">Admin</th>
-                          <th className="px-4 py-2 font-medium">Inventory</th>
-                          <th className="px-4 py-2 font-medium">Ordering</th>
-                          <th className="px-4 py-2 font-medium">Analytics</th>
-                          <th className="px-4 py-2 font-medium">Access</th>
+                          <th className="px-4 py-2 font-medium">Role</th>
                           <th className="px-4 py-2"></th>
                         </tr>
                       </thead>
@@ -396,17 +442,9 @@ export default function Dashboard() {
                               <td className="px-4 py-3 text-gray-700 whitespace-nowrap">
                                 {u.email}
                               </td>
-                              {[true, true, true, true, true].map((val, i) => (
-                                <td key={i} className="px-4 py-3 text-center">
-                                  <input
-                                    type="checkbox"
-                                    className="accent-[var(--oe-green)]"
-                                    checked={val}
-                                    disabled={u.isCurrentUser}
-                                    readOnly
-                                  />
-                                </td>
-                              ))}
+                              <td className="px-4 py-3 text-gray-700 whitespace-nowrap">
+                                {u.role.replace("_", " ")}
+                              </td>
                               <td className="px-4 py-3 text-right">
                                 <button
                                   className="rounded bg-black/5 px-3 py-1 text-xs text-gray-700"
@@ -449,12 +487,25 @@ export default function Dashboard() {
               if (!userId) return;
               const { data } = await supabase
                 .from("businesses")
-                .select("business_name")
+                .select("id, business_name")
                 .eq("created_by_user", userId)
                 .order("created_at", { ascending: true })
                 .limit(1)
                 .maybeSingle();
               setBusinessName(data?.business_name || "");
+              setBusinessId(data?.id || "");
+            }}
+          />
+          <InviteUserModal
+            isOpen={inviteOpen}
+            onClose={() => setInviteOpen(false)}
+            onInvite={async ({ email, role }) => {
+              // Implementation plan (next step):
+              // 1) Create an invitations table (id, business_id, email, role, token, invited_by, invited_at, expires_at, accepted_at)
+              // 2) Insert a pending invite row here with a secure token
+              // 3) Send email via your SMTP provider (or Edge Function)
+              // 4) Accept flow creates user (if needed) and upserts user_business_roles
+              console.log("Invite payload", { email, role, businessId });
             }}
           />
         </div>
