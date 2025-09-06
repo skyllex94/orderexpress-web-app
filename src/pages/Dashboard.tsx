@@ -12,7 +12,6 @@ const items: SidebarItem[] = [
   { key: "inventory", label: "Inventory" },
   { key: "ordering", label: "Ordering" },
   { key: "analytics", label: "Analytics" },
-  { key: "settings", label: "Settings" },
 ];
 
 export default function Dashboard() {
@@ -25,6 +24,10 @@ export default function Dashboard() {
     }
   });
   const [active, setActive] = useState("overview");
+  const [settingsOpen, setSettingsOpen] = useState(true);
+  const [settingsSection, setSettingsSection] = useState<
+    "plan" | "users" | "account" | null
+  >(null);
   const [businessName, setBusinessName] = useState<string>("");
   const [loading, setLoading] = useState(true);
 
@@ -37,7 +40,7 @@ export default function Dashboard() {
       const { data } = await supabase
         .from("businesses")
         .select("business_name")
-        .eq("created_by", userId)
+        .eq("created_by_user", userId)
         .order("created_at", { ascending: true })
         .limit(1)
         .maybeSingle();
@@ -133,7 +136,10 @@ export default function Dashboard() {
           {items.map((it) => (
             <button
               key={it.key}
-              onClick={() => setActive(it.key)}
+              onClick={() => {
+                setActive(it.key);
+                setSettingsOpen(false);
+              }}
               className={`w-full text-left flex items-center gap-3 rounded-md px-3 py-2 transition ${
                 active === it.key ? "bg-white/10" : "hover:bg-white/5"
               }`}
@@ -142,6 +148,80 @@ export default function Dashboard() {
               {!collapsed && <span>{it.label}</span>}
             </button>
           ))}
+
+          {/* Settings dropdown */}
+          <div>
+            <button
+              onClick={() => {
+                setActive("settings");
+                setSettingsOpen(!settingsOpen);
+              }}
+              className={`w-full text-left flex items-center justify-between rounded-md px-3 py-2 transition ${
+                active === "settings" ? "bg-white/10" : "hover:bg-white/5"
+              }`}
+            >
+              <div className="flex items-center gap-3">
+                <Icon k="settings" active={active === "settings"} />
+                {!collapsed && <span>Settings</span>}
+              </div>
+              {!collapsed && (
+                <svg
+                  className={`h-4 w-4 text-gray-400 transition-transform ${
+                    settingsOpen ? "rotate-180" : ""
+                  }`}
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                >
+                  <path d="M6 9l6 6 6-6" />
+                </svg>
+              )}
+            </button>
+            {settingsOpen && (
+              <div className="mt-1 space-y-1 pl-8">
+                <button
+                  onClick={() => {
+                    setActive("settings");
+                    setSettingsSection("plan");
+                  }}
+                  className={`block w-full text-left rounded-md px-3 py-2 text-sm ${
+                    settingsSection === "plan"
+                      ? "bg-white/10"
+                      : "hover:bg-white/5"
+                  }`}
+                >
+                  {!collapsed && "Plan & Billing"}
+                </button>
+                <button
+                  onClick={() => {
+                    setActive("settings");
+                    setSettingsSection("users");
+                  }}
+                  className={`block w-full text-left rounded-md px-3 py-2 text-sm ${
+                    settingsSection === "users"
+                      ? "bg-white/10"
+                      : "hover:bg-white/5"
+                  }`}
+                >
+                  {!collapsed && "Users"}
+                </button>
+                <button
+                  onClick={() => {
+                    setActive("settings");
+                    setSettingsSection("account");
+                  }}
+                  className={`block w-full text-left rounded-md px-3 py-2 text-sm ${
+                    settingsSection === "account"
+                      ? "bg-white/10"
+                      : "hover:bg-white/5"
+                  }`}
+                >
+                  {!collapsed && "Account Settings"}
+                </button>
+              </div>
+            )}
+          </div>
         </nav>
         {/* Sign out option above arrow */}
         <div className="px-2 pb-2">
@@ -188,10 +268,135 @@ export default function Dashboard() {
       </aside>
       <main className="flex-1 p-6">
         <div className="mx-auto max-w-[90rem]">
-          <h1 className="text-2xl font-semibold text-[var(--oe-black)]">
-            {items.find((i) => i.key === active)?.label}
-          </h1>
-          <p className="mt-2 text-gray-600">This is the {active} section.</p>
+          {active !== "settings" && (
+            <>
+              <h1 className="text-2xl font-semibold text-[var(--oe-black)]">
+                {items.find((i) => i.key === active)?.label}
+              </h1>
+              <p className="mt-2 text-gray-600">
+                This is the {active} section.
+              </p>
+            </>
+          )}
+
+          {active === "settings" && (
+            <div className="space-y-6">
+              <h1 className="text-2xl font-semibold text-[var(--oe-black)]">
+                Settings
+              </h1>
+
+              {settingsSection === "users" && (
+                <div className="rounded-2xl bg-white p-6">
+                  <div className="pb-4 flex items-center justify-between">
+                    <h2 className="font-medium">Users</h2>
+                    <button className="rounded-md bg-[var(--oe-green)] px-3 py-2 text-black text-sm hover:opacity-90">
+                      Invite user
+                    </button>
+                  </div>
+                  <div className="overflow-x-auto">
+                    <table className="min-w-full text-sm">
+                      <thead className="text-xs text-gray-500">
+                        <tr>
+                          <th className="text-left px-4 py-2 font-medium">
+                            User
+                          </th>
+                          <th className="text-left px-4 py-2 font-medium">
+                            Email
+                          </th>
+                          <th className="px-4 py-2 font-medium">Admin</th>
+                          <th className="px-4 py-2 font-medium">Inventory</th>
+                          <th className="px-4 py-2 font-medium">Ordering</th>
+                          <th className="px-4 py-2 font-medium">Analytics</th>
+                          <th className="px-4 py-2 font-medium">Access</th>
+                          <th className="px-4 py-2"></th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {[
+                          {
+                            name: "Craig Montague",
+                            email: "cmontague@gmail.com",
+                            admin: true,
+                            inventory: true,
+                            ordering: false,
+                            analytics: false,
+                            access: true,
+                          },
+                          {
+                            name: "Evan Ramirez",
+                            email: "ramirez@example.com",
+                            admin: false,
+                            inventory: true,
+                            ordering: true,
+                            analytics: true,
+                            access: true,
+                          },
+                          {
+                            name: "Kamen Kanchev",
+                            email: "kkanchev@gmail.com",
+                            admin: false,
+                            inventory: false,
+                            ordering: true,
+                            analytics: false,
+                            access: true,
+                          },
+                        ].map((u) => (
+                          <tr key={u.email} className="hover:bg-black/5">
+                            <td className="px-4 py-3 whitespace-nowrap">
+                              {u.name}
+                            </td>
+                            <td className="px-4 py-3 text-gray-700 whitespace-nowrap">
+                              {u.email}
+                            </td>
+                            {[
+                              u.admin,
+                              u.inventory,
+                              u.ordering,
+                              u.analytics,
+                              u.access,
+                            ].map((val, i) => (
+                              <td key={i} className="px-4 py-3 text-center">
+                                <input
+                                  type="checkbox"
+                                  className="accent-[var(--oe-green)]"
+                                  checked={val}
+                                  readOnly
+                                />
+                              </td>
+                            ))}
+                            <td className="px-4 py-3 text-right">
+                              <button
+                                className="rounded bg-black/5 px-3 py-1 text-xs text-gray-700"
+                                disabled
+                              >
+                                Update
+                              </button>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              )}
+
+              {settingsSection === "plan" && (
+                <div className="rounded-2xl bg-white p-6 text-gray-700">
+                  Plan & Billing (coming soon)
+                </div>
+              )}
+              {settingsSection === "account" && (
+                <div className="rounded-2xl bg-white p-6 text-gray-700">
+                  Account Settings (coming soon)
+                </div>
+              )}
+              {!settingsSection && (
+                <p className="text-gray-600">
+                  Choose a settings section from the sidebar.
+                </p>
+              )}
+            </div>
+          )}
         </div>
       </main>
     </div>

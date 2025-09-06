@@ -96,7 +96,7 @@ export default function SignupPage() {
     try {
       const { error } = await supabase.from("businesses").insert({
         business_name: businessName,
-        created_by: pendingUserId,
+        created_by_user: pendingUserId,
         user_email: email || null,
         business_address:
           address1 +
