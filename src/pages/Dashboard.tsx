@@ -56,22 +56,57 @@ export default function Dashboard() {
   >([]);
   const [usersLoading, setUsersLoading] = useState(false);
 
+  function formatRoleLabel(role: Role): string {
+    const s = role.replace("_", " ");
+    return s.charAt(0).toUpperCase() + s.slice(1);
+  }
+
   useEffect(() => {
     let mounted = true;
     async function load() {
       const { data: sessionData } = await supabase.auth.getSession();
       const userId = sessionData.session?.user.id;
       if (!userId) return;
-      const { data } = await supabase
+      // 1) Try businesses the user created/owns
+      const { data: ownBiz } = await supabase
         .from("businesses")
         .select("id, business_name")
         .eq("created_by_user", userId)
         .order("created_at", { ascending: true })
         .limit(1)
         .maybeSingle();
+      if (ownBiz) {
+        if (!mounted) return;
+        setBusinessName(ownBiz.business_name || "");
+        setBusinessId(ownBiz.id || "");
+        setLoading(false);
+        return;
+      }
+
+      // 2) Otherwise, find a business via user_business_roles (invited users)
+      const { data: roleRow } = await supabase
+        .from("user_business_roles")
+        .select("business_id")
+        .eq("user_id", userId)
+        .limit(1)
+        .maybeSingle();
+
+      if (roleRow?.business_id) {
+        const { data: biz } = await supabase
+          .from("businesses")
+          .select("id, business_name")
+          .eq("id", roleRow.business_id)
+          .maybeSingle();
+        if (!mounted) return;
+        setBusinessName(biz?.business_name || "");
+        setBusinessId(biz?.id || "");
+        setLoading(false);
+        return;
+      }
+
       if (!mounted) return;
-      setBusinessName(data?.business_name || "");
-      setBusinessId(data?.id || "");
+      setBusinessName("");
+      setBusinessId("");
       setLoading(false);
     }
     load();
@@ -110,39 +145,59 @@ export default function Dashboard() {
             : undefined;
         const fullName = [first, last].filter(Boolean).join(" ") || "Owner";
 
-        // Start with current user as admin by default if no role row exists yet
-        const list: {
+        let list: {
           name: string;
           email: string;
           isCurrentUser: boolean;
           role: Role;
-        }[] = [
-          {
-            name: fullName,
-            email: current.email || "",
-            isCurrentUser: true,
-            role: "admin",
-          },
-        ];
+        }[] = [];
 
         if (businessId) {
-          const { data: roleRows } = await supabase
-            .from("user_business_roles")
-            .select("user_id, role")
-            .eq("business_id", businessId);
-          if (roleRows && Array.isArray(roleRows)) {
-            for (const row of roleRows) {
-              const isSelf = row.user_id === current.id;
-              if (isSelf) {
-                list[0].role = (row.role as Role) ?? "admin";
-                continue;
+          // Try RPC that joins user metadata from auth.users
+          const { data: members, error: rpcErr } = await supabase.rpc(
+            "get_business_users",
+            { p_business_id: businessId }
+          );
+          if (!rpcErr && Array.isArray(members)) {
+            list = members.map(
+              (m: {
+                user_id: string;
+                email: string | null;
+                first_name: string | null;
+                last_name: string | null;
+                role: Role | string;
+              }) => {
+                const isSelf = m.user_id === current.id;
+                const name =
+                  [m.first_name, m.last_name]
+                    .filter((v): v is string => Boolean(v))
+                    .join(" ") ||
+                  m.email ||
+                  "User";
+                return {
+                  name,
+                  email: m.email || "",
+                  isCurrentUser: isSelf,
+                  role: (m.role as Role) ?? "inventory_manager",
+                };
               }
-              list.push({
-                name: "User",
-                email: "—",
-                isCurrentUser: false,
-                role: (row.role as Role) ?? "inventory_manager",
-              });
+            );
+          } else {
+            // Fallback: roles only; use current user details, placeholders for others
+            const { data: roleRows } = await supabase
+              .from("user_business_roles")
+              .select("user_id, role")
+              .eq("business_id", businessId);
+            if (roleRows && Array.isArray(roleRows)) {
+              for (const row of roleRows) {
+                const isSelf = row.user_id === current.id;
+                list.push({
+                  name: isSelf ? fullName : "User",
+                  email: isSelf ? current.email || "" : "—",
+                  isCurrentUser: isSelf,
+                  role: (row.role as Role) ?? "inventory_manager",
+                });
+              }
             }
           }
         }
@@ -443,7 +498,7 @@ export default function Dashboard() {
                                 {u.email}
                               </td>
                               <td className="px-4 py-3 text-gray-700 whitespace-nowrap">
-                                {u.role.replace("_", " ")}
+                                {formatRoleLabel(u.role)}
                               </td>
                               <td className="px-4 py-3 text-right">
                                 <button
@@ -485,15 +540,34 @@ export default function Dashboard() {
               const { data: sessionData } = await supabase.auth.getSession();
               const userId = sessionData.session?.user.id;
               if (!userId) return;
-              const { data } = await supabase
+              // Re-run same selection logic used on load
+              const { data: ownBiz } = await supabase
                 .from("businesses")
                 .select("id, business_name")
                 .eq("created_by_user", userId)
                 .order("created_at", { ascending: true })
                 .limit(1)
                 .maybeSingle();
-              setBusinessName(data?.business_name || "");
-              setBusinessId(data?.id || "");
+              if (ownBiz) {
+                setBusinessName(ownBiz.business_name || "");
+                setBusinessId(ownBiz.id || "");
+                return;
+              }
+              const { data: roleRow } = await supabase
+                .from("user_business_roles")
+                .select("business_id")
+                .eq("user_id", userId)
+                .limit(1)
+                .maybeSingle();
+              if (roleRow?.business_id) {
+                const { data: biz } = await supabase
+                  .from("businesses")
+                  .select("id, business_name")
+                  .eq("id", roleRow.business_id)
+                  .maybeSingle();
+                setBusinessName(biz?.business_name || "");
+                setBusinessId(biz?.id || "");
+              }
             }}
           />
           <InviteUserModal

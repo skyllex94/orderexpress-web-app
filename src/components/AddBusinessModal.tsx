@@ -35,6 +35,7 @@ export default function AddBusinessModal({
     try {
       const { data: userData } = await supabase.auth.getUser();
       const userId = userData.user?.id;
+      const userEmail = userData.user?.email || null;
       if (!userId) {
         setErrorMessage("You must be logged in to create a business.");
         return;
@@ -44,6 +45,7 @@ export default function AddBusinessModal({
         .insert({
           business_name: businessName,
           created_by_user: userId,
+          user_email: userEmail,
           business_address:
             address1 +
             " " +
