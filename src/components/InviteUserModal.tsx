@@ -36,8 +36,11 @@ export default function InviteUserModal({
       await onInvite({ email, role });
       onClose();
     } catch (err) {
+      const anyErr = err as any;
+      const serverMsg = anyErr?.context?.error || anyErr?.context?.body?.error;
       const message =
-        err instanceof Error ? err.message : "Could not send invitation.";
+        serverMsg ||
+        (err instanceof Error ? err.message : "Could not send invitation.");
       setErrorMessage(message);
     } finally {
       setSubmitting(false);
