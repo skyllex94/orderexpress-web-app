@@ -6,6 +6,7 @@ import LoginPage from "./pages/Login";
 import SignupPage from "./pages/Signup.tsx";
 import Dashboard from "./pages/Dashboard.tsx";
 import ProtectedRoute from "./components/ProtectedRoute.tsx";
+import AcceptInvite from "./pages/AcceptInvite";
 
 function App() {
   return (
@@ -17,6 +18,7 @@ function App() {
           <Route path="/" element={<Landing />} />
           <Route path="/login" element={<LoginPage />} />
           <Route path="/signup" element={<SignupPage />} />
+          <Route path="/accept-invite" element={<AcceptInvite />} />
           <Route
             path="/dashboard"
             element={
