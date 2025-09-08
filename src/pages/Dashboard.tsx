@@ -500,12 +500,46 @@ export default function Dashboard() {
             isOpen={inviteOpen}
             onClose={() => setInviteOpen(false)}
             onInvite={async ({ email, role }) => {
-              // Implementation plan (next step):
-              // 1) Create an invitations table (id, business_id, email, role, token, invited_by, invited_at, expires_at, accepted_at)
-              // 2) Insert a pending invite row here with a secure token
-              // 3) Send email via your SMTP provider (or Edge Function)
-              // 4) Accept flow creates user (if needed) and upserts user_business_roles
-              console.log("Invite payload", { email, role, businessId });
+              if (!businessId) {
+                throw new Error("Please create/select a business first.");
+              }
+              const { data: sessionData } = await supabase.auth.getSession();
+              const userId = sessionData.session?.user.id;
+              if (!userId) {
+                throw new Error("You must be logged in to invite users.");
+              }
+
+              const token = (globalThis.crypto?.randomUUID?.() ??
+                Math.random().toString(36).slice(2)) as string;
+
+              // 1) Insert pending invitation row
+              const { error: insertError } = await supabase
+                .from("invitations")
+                .insert({
+                  business_id: businessId,
+                  email,
+                  role,
+                  token,
+                  invited_by: userId,
+                  status: "pending",
+                });
+              if (insertError) throw insertError;
+
+              // 2) Send email via Edge Function (Brevo SMTP)
+              const acceptUrl = `${window.location.origin}/accept-invite?token=${token}`;
+              const subject = "You’re invited to OrderExpress";
+              const text = `You’ve been invited to OrderExpress. Open this link to accept: ${acceptUrl}`;
+              const html = `<p>You’ve been invited to <strong>OrderExpress</strong>.</p>
+                <p>Role: <strong>${role.replace("_", " ")}</strong></p>
+                <p><a href="${acceptUrl}">Accept Invitation</a></p>`;
+
+              const { error: fnError } = await supabase.functions.invoke(
+                "send-invite-email",
+                {
+                  body: { to: email, subject, text, html },
+                }
+              );
+              if (fnError) throw fnError;
             }}
           />
         </div>
