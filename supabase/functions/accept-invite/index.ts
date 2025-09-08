@@ -21,25 +21,38 @@ serve(async (req: Request) => {
   }
 
   try {
-    const raw = await req.text();
-    if (!raw) {
-      return new Response(JSON.stringify({ error: "Empty body" }), {
-        headers: { "Content-Type": "application/json", ...corsHeaders },
-        status: 400,
-      });
-    }
-
-    let payload: any;
+    console.log("[accept-invite] incoming", {
+      method: req.method,
+      url: req.url,
+      contentType: req.headers.get("content-type"),
+      contentLength: req.headers.get("content-length"),
+      cfRay: (req as any).headers?.get?.("cf-ray") ?? undefined,
+    });
+    let payload: any = null;
     try {
-      payload = JSON.parse(raw);
-    } catch {
-      return new Response(JSON.stringify({ error: "Invalid JSON body" }), {
-        headers: { "Content-Type": "application/json", ...corsHeaders },
-        status: 400,
-      });
+      payload = await req.json();
+      console.log("[accept-invite] json parsed");
+    } catch (jsonErr) {
+      console.error("[accept-invite] req.json failed", jsonErr);
+      return new Response(
+        JSON.stringify({ error: "Empty or invalid JSON body" }),
+        {
+          headers: { "Content-Type": "application/json", ...corsHeaders },
+          status: 400,
+        }
+      );
     }
 
     const { token, email, password, first_name, last_name } = payload ?? {};
+    console.log("[accept-invite] payload parsed", {
+      hasToken: Boolean(token),
+      tokenPreview:
+        typeof token === "string" ? `${token.substring(0, 8)}…` : typeof token,
+      email,
+      pwLen: typeof password === "string" ? password.length : undefined,
+      first_name,
+      last_name,
+    });
     if (!token || !email || !password) {
       return new Response(
         JSON.stringify({ error: "Missing token, email, or password" }),
@@ -50,6 +63,7 @@ serve(async (req: Request) => {
       );
     }
     if (!isUuidV4(token)) {
+      console.error("[accept-invite] invalid token format", token);
       return new Response(
         JSON.stringify({ error: "Invalid token format (expected UUID)" }),
         {
@@ -61,6 +75,11 @@ serve(async (req: Request) => {
 
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+    console.log("[accept-invite] env", {
+      hasUrl: Boolean(supabaseUrl),
+      hasServiceKey: Boolean(serviceKey),
+      urlPreview: supabaseUrl?.substring?.(0, 32),
+    });
     const admin = createClient(supabaseUrl, serviceKey);
 
     // 1) Validate invite
@@ -69,6 +88,13 @@ serve(async (req: Request) => {
       .select("id, email, role, business_id, status, expires_at")
       .eq("token", token) // safe now that we validated UUID
       .maybeSingle();
+    console.log("[accept-invite] invite lookup", {
+      hasInvite: Boolean(invite),
+      inviteStatus: invite?.status,
+      inviteEmail: invite?.email,
+      inviteBusinessId: invite?.business_id,
+      inviteErr: inviteErr?.message,
+    });
     if (inviteErr) {
       return new Response(JSON.stringify({ error: inviteErr.message }), {
         headers: { "Content-Type": "application/json", ...corsHeaders },
@@ -97,6 +123,10 @@ serve(async (req: Request) => {
       });
     }
     if (String(invite.email).toLowerCase() !== String(email).toLowerCase()) {
+      console.error("[accept-invite] email mismatch", {
+        inviteEmail: invite.email,
+        email,
+      });
       return new Response(
         JSON.stringify({ error: "Email does not match invitation" }),
         {
@@ -114,6 +144,10 @@ serve(async (req: Request) => {
         email_confirm: true, // mark as confirmed
         user_metadata: { first_name, last_name },
       });
+    console.log("[accept-invite] createUser", {
+      userId: created?.user?.id,
+      createErr: createErr?.message,
+    });
 
     if (createErr) {
       const msg = String(createErr.message || createErr);
@@ -132,6 +166,7 @@ serve(async (req: Request) => {
 
     const userId = created.user?.id;
     if (!userId) {
+      console.error("[accept-invite] missing user id after createUser");
       return new Response(JSON.stringify({ error: "User creation failed" }), {
         headers: { "Content-Type": "application/json", ...corsHeaders },
         status: 500,
@@ -145,6 +180,12 @@ serve(async (req: Request) => {
         { user_id: userId, business_id: invite.business_id, role: invite.role },
         { onConflict: "user_id,business_id" }
       );
+    console.log("[accept-invite] upsert role", {
+      userId,
+      businessId: invite.business_id,
+      role: invite.role,
+      roleErr: roleErr?.message,
+    });
     if (roleErr) {
       return new Response(JSON.stringify({ error: roleErr.message }), {
         headers: { "Content-Type": "application/json", ...corsHeaders },
@@ -157,6 +198,10 @@ serve(async (req: Request) => {
       .from("invitations")
       .update({ status: "accepted", accepted_at: new Date().toISOString() })
       .eq("id", invite.id);
+    console.log("[accept-invite] mark accepted", {
+      inviteId: invite.id,
+      accErr: accErr?.message,
+    });
     if (accErr) {
       return new Response(JSON.stringify({ error: accErr.message }), {
         headers: { "Content-Type": "application/json", ...corsHeaders },
@@ -164,11 +209,13 @@ serve(async (req: Request) => {
       });
     }
 
+    console.log("[accept-invite] success", { userId, email });
     return new Response(JSON.stringify({ success: true }), {
       headers: { "Content-Type": "application/json", ...corsHeaders },
       status: 200,
     });
   } catch (error) {
+    console.error("[accept-invite] unhandled", error);
     return new Response(
       JSON.stringify({ error: String((error as any)?.message ?? error) }),
       {

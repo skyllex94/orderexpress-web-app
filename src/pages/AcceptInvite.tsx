@@ -90,7 +90,6 @@ export default function AcceptInvite() {
       const { data: fnData, error: fnError } = await supabase.functions.invoke(
         "accept-invite",
         {
-          headers: { "Content-Type": "application/json" },
           body: {
             token,
             email,

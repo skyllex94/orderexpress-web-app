@@ -503,38 +503,43 @@ export default function Dashboard() {
               if (!businessId) {
                 throw new Error("Please create/select a business first.");
               }
-              const payload = { email, role, business_id: businessId };
-              const functionsBase: string =
-                (
-                  supabase as unknown as { functionsUrl?: URL }
-                ).functionsUrl?.toString?.() ||
-                `${import.meta.env.VITE_SUPABASE_URL as string}/functions/v1`;
-              const res = await fetch(`${functionsBase}/invite-user-admin`, {
-                method: "POST",
-                headers: {
-                  "Content-Type": "application/json",
-                  apikey:
-                    (supabase as unknown as { supabaseKey?: string })
-                      .supabaseKey ||
-                    (import.meta.env.VITE_SUPABASE_ANON_KEY as string),
-                  Authorization: `Bearer ${
-                    (supabase as unknown as { supabaseKey?: string })
-                      .supabaseKey ||
-                    (import.meta.env.VITE_SUPABASE_ANON_KEY as string)
-                  }`,
-                },
-                body: JSON.stringify(payload),
-              });
-              if (!res.ok) {
-                let errText = "Failed to send invite";
-                try {
-                  const j = await res.json();
-                  errText = j.error || errText;
-                } catch {
-                  /* ignore */
-                }
-                throw new Error(errText);
+              const { data: sessionData } = await supabase.auth.getSession();
+              const userId = sessionData.session?.user.id;
+              if (!userId) {
+                throw new Error("You must be logged in to invite users.");
               }
+
+              const token = (globalThis.crypto?.randomUUID?.() ??
+                Math.random().toString(36).slice(2)) as string;
+
+              // 1) Insert pending invitation row
+              const { error: insertError } = await supabase
+                .from("invitations")
+                .insert({
+                  business_id: businessId,
+                  email,
+                  role,
+                  token,
+                  invited_by: userId,
+                  status: "pending",
+                });
+              if (insertError) throw insertError;
+
+              // 2) Send email via Edge Function (Brevo SMTP)
+              const acceptUrl = `${window.location.origin}/accept-invite?token=${token}`;
+              const subject = "You’re invited to OrderExpress";
+              const text = `You’ve been invited to OrderExpress. Open this link to accept: ${acceptUrl}`;
+              const html = `<p>You’ve been invited to <strong>OrderExpress</strong>.</p>
+                <p>Role: <strong>${role.replace("_", " ")}</strong></p>
+                <p><a href="${acceptUrl}">Accept Invitation</a></p>`;
+
+              const { error: fnError } = await supabase.functions.invoke(
+                "send-invite-email",
+                {
+                  body: { to: email, subject, text, html },
+                }
+              );
+              if (fnError) throw fnError;
             }}
           />
         </div>
