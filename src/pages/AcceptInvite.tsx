@@ -13,6 +13,7 @@ export default function AcceptInvite() {
   const [role, setRole] = useState<string>("");
   const [businessId, setBusinessId] = useState<string>("");
   const [password, setPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -79,27 +80,42 @@ export default function AcceptInvite() {
       setErrorMessage("Password must be at least 8 characters.");
       return;
     }
+    if (password !== confirmPassword) {
+      setErrorMessage("Passwords do not match.");
+      return;
+    }
     setIsSubmitting(true);
     try {
-      // 1) If already logged in as this email, skip sign up
-      const { data: sessionData } = await supabase.auth.getSession();
-      const currentEmail = sessionData.session?.user.email;
-      if (!currentEmail) {
-        // Sign up the user with the invite email
-        const { error: signError } = await supabase.auth.signUp({
-          email,
-          password,
-          options: {
-            data: { first_name: firstName, last_name: lastName },
+      // 1) Create user as confirmed via Edge Function (Admin API)
+      const { data: fnData, error: fnError } = await supabase.functions.invoke(
+        "accept-invite",
+        {
+          headers: { "Content-Type": "application/json" },
+          body: {
+            token,
+            email,
+            password,
+            first_name: firstName,
+            last_name: lastName,
           },
-        });
-        if (signError) {
-          setErrorMessage(signError.message);
-          return;
         }
+      );
+      if (fnError) {
+        // Surface server-provided error details when available
+        const context: any = (fnError as any).context || {};
+        const serverMsg = context.error || context?.body?.error;
+        setErrorMessage(serverMsg || fnError.message);
+        return;
+      }
+      if (fnData && fnData.code === "USER_EXISTS") {
+        setErrorMessage(
+          "This email already has an account. Please log in with your password, then re-open the invite link."
+        );
+        return;
       }
 
-      // 2) Ensure we have a logged in user
+      // 2) Sign in and ensure we have a logged in user
+      await supabase.auth.signInWithPassword({ email, password });
       const { data: sessionData2 } = await supabase.auth.getSession();
       const userId = sessionData2.session?.user.id;
       const authedEmail = sessionData2.session?.user.email;
@@ -169,7 +185,7 @@ export default function AcceptInvite() {
   }
 
   return (
-    <main className="oe-content-bg min-h-[60vh] pt-16">
+    <main className="oe-content-bg min-h-[60vh] pt-28">
       <div className="mx-auto max-w-2xl px-4 sm:px-6 lg:px-8">
         <div className="rounded-2xl bg-white p-6">
           <h1 className="text-2xl font-semibold text-[var(--oe-black)]">
@@ -230,6 +246,18 @@ export default function AcceptInvite() {
                   style={{ width: `${passwordStrengthPercent}%` }}
                 />
               </div>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700">
+                Confirm password
+              </label>
+              <input
+                type="password"
+                value={confirmPassword}
+                onChange={(e) => setConfirmPassword(e.target.value)}
+                className="mt-1 w-full rounded-md bg-white px-3 py-2 text-[var(--oe-black)] ring-1 ring-black/10 focus:ring-black/20"
+                placeholder="Re-enter your password"
+              />
             </div>
             {errorMessage && (
               <div className="rounded-md bg-red-500/10 px-3 py-2 text-sm text-red-700">
