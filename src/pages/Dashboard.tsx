@@ -43,6 +43,10 @@ export default function Dashboard() {
   const [modalOpen, setModalOpen] = useState(false);
   const [inviteOpen, setInviteOpen] = useState(false);
   const [businessDrawerOpen, setBusinessDrawerOpen] = useState(false);
+  const [allBusinesses, setAllBusinesses] = useState<
+    { id: string; business_name: string }[]
+  >([]);
+  const [bizLoading, setBizLoading] = useState(false);
   type Role =
     | "admin"
     | "inventory_manager"
@@ -135,6 +139,71 @@ export default function Dashboard() {
       mounted = false;
     };
   }, [businessId]);
+
+  // Load all businesses when drawer opens
+  useEffect(() => {
+    let mounted = true;
+    async function loadAll() {
+      if (!businessDrawerOpen) return;
+      setBizLoading(true);
+      try {
+        const { data: sessionData } = await supabase.auth.getSession();
+        const userId = sessionData.session?.user.id;
+        if (!userId) return;
+
+        // Businesses created by the user
+        const { data: own } = await supabase
+          .from("businesses")
+          .select("id, business_name, created_at")
+          .eq("created_by_user", userId)
+          .order("created_at", { ascending: true });
+
+        // Businesses via roles
+        const { data: roles } = await supabase
+          .from("user_business_roles")
+          .select("business_id")
+          .eq("user_id", userId);
+
+        let roleBusinesses: { id: string; business_name: string }[] = [];
+        const roleIds = (roles || [])
+          .map((r) => r.business_id as string)
+          .filter(Boolean);
+        if (roleIds.length > 0) {
+          const { data: viaRoles } = await supabase
+            .from("businesses")
+            .select("id, business_name")
+            .in("id", roleIds);
+          roleBusinesses = (viaRoles || []).map((b) => ({
+            id: b.id as string,
+            business_name: (b.business_name as string) || "Untitled",
+          }));
+        }
+
+        const ownedBusinesses = (own || []).map((b) => ({
+          id: b.id as string,
+          business_name: (b.business_name as string) || "Untitled",
+        }));
+
+        // Merge and de-duplicate
+        const mergedMap = new Map<
+          string,
+          { id: string; business_name: string }
+        >();
+        [...ownedBusinesses, ...roleBusinesses].forEach((b) => {
+          mergedMap.set(b.id, b);
+        });
+        const merged = Array.from(mergedMap.values());
+
+        if (mounted) setAllBusinesses(merged);
+      } finally {
+        if (mounted) setBizLoading(false);
+      }
+    }
+    loadAll();
+    return () => {
+      mounted = false;
+    };
+  }, [businessDrawerOpen]);
 
   // Enforce allowed menu for role
   useEffect(() => {
@@ -559,13 +628,28 @@ export default function Dashboard() {
         <div className="p-4">
           <div className="text-sm text-gray-300">Businesses</div>
           <div className="mt-3 space-y-2">
-            <div className="rounded-md border border-[color:var(--oe-border)] p-3">
-              <div className="font-medium truncate">
-                {businessName || "Your Business"}
+            {bizLoading && (
+              <div className="flex items-center justify-center py-8">
+                <div className="h-8 w-8 rounded-full border-2 border-white/20 border-t-[var(--oe-green)] animate-spin" />
               </div>
-              <div className="text-xs text-gray-400 mt-1">Current</div>
-            </div>
-            {/* Additional businesses will appear here */}
+            )}
+            {!bizLoading && allBusinesses.length === 0 && (
+              <div className="text-xs text-gray-400">No businesses found.</div>
+            )}
+            {!bizLoading &&
+              allBusinesses.map((b) => (
+                <div
+                  key={b.id}
+                  className={`rounded-md border border-[color:var(--oe-border)] p-3 ${
+                    b.id === businessId ? "bg-white/5" : "hover:bg-white/5"
+                  }`}
+                >
+                  <div className="font-medium truncate">{b.business_name}</div>
+                  {b.id === businessId && (
+                    <div className="text-xs text-gray-400 mt-1">Current</div>
+                  )}
+                </div>
+              ))}
           </div>
         </div>
       </div>
