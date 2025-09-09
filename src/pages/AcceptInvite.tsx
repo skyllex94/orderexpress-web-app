@@ -11,7 +11,6 @@ export default function AcceptInvite() {
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [email, setEmail] = useState<string>("");
   const [role, setRole] = useState<string>("");
-  const [businessId, setBusinessId] = useState<string>("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [firstName, setFirstName] = useState("");
@@ -62,7 +61,7 @@ export default function AcceptInvite() {
         if (!mounted) return;
         setEmail(data.email);
         setRole(data.role);
-        setBusinessId(data.business_id);
+        // businessId not needed on client; server handles association
       } finally {
         if (mounted) setLoading(false);
       }
@@ -101,7 +100,12 @@ export default function AcceptInvite() {
       );
       if (fnError) {
         // Surface server-provided error details when available
-        const context: any = (fnError as any).context || {};
+        const context =
+          (
+            fnError as unknown as {
+              context?: { error?: string; body?: { error?: string } };
+            }
+          )?.context || {};
         const serverMsg = context.error || context?.body?.error;
         setErrorMessage(serverMsg || fnError.message);
         return;
@@ -127,27 +131,7 @@ export default function AcceptInvite() {
         return;
       }
 
-      // 3) Upsert role row
-      const { error: roleError } = await supabase
-        .from("user_business_roles")
-        .upsert(
-          { user_id: userId, business_id: businessId, role },
-          { onConflict: "user_id,business_id" }
-        );
-      if (roleError) {
-        setErrorMessage(roleError.message);
-        return;
-      }
-
-      // 4) Mark invite accepted
-      const { error: inviteError } = await supabase
-        .from("invitations")
-        .update({ status: "accepted", accepted_at: new Date().toISOString() })
-        .eq("token", token);
-      if (inviteError) {
-        setErrorMessage(inviteError.message);
-        return;
-      }
+      // Role upsert and invite status update are handled by the server function.
 
       navigate("/dashboard");
     } catch (err) {
