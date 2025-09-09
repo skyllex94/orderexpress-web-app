@@ -316,7 +316,7 @@ export default function Dashboard() {
         </div>
       </aside>
       <main className="flex-1 p-6">
-        <div className="mx-auto max-w-[90rem]">
+        <div className="mx-auto max-w-[120rem]">
           {active === "overview" && (
             <>
               <Overview />
