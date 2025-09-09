@@ -55,6 +55,10 @@ export default function Dashboard() {
     }[]
   >([]);
   const [usersLoading, setUsersLoading] = useState(false);
+  const [pendingInvites, setPendingInvites] = useState<
+    { email: string; role: Role; invited_at?: string | null }[]
+  >([]);
+  const [usersRefreshKey, setUsersRefreshKey] = useState<number>(0);
 
   function formatRoleLabel(role: Role): string {
     const s = role.replace("_", " ");
@@ -123,7 +127,7 @@ export default function Dashboard() {
     }
   }, [collapsed]);
 
-  // Load users for current business for Settings > Users
+  // Load users and pending invites for current business for Settings > Users
   useEffect(() => {
     if (active !== "settings" || settingsSection !== "users") return;
     let mounted = true;
@@ -204,6 +208,26 @@ export default function Dashboard() {
 
         if (!mounted) return;
         setUsers(list);
+
+        // Load pending invitations for this business
+        if (businessId) {
+          const { data: pending } = await supabase
+            .from("invitations")
+            .select("email, role, invited_at, status")
+            .eq("business_id", businessId)
+            .eq("status", "pending")
+            .order("invited_at", { ascending: true });
+          if (!mounted) return;
+          setPendingInvites(
+            (pending || []).map((p) => ({
+              email: p.email as string,
+              role: (p.role as Role) ?? ("inventory_manager" as Role),
+              invited_at: (p.invited_at as string) ?? null,
+            }))
+          );
+        } else {
+          setPendingInvites([]);
+        }
       } finally {
         if (mounted) setUsersLoading(false);
       }
@@ -212,7 +236,7 @@ export default function Dashboard() {
     return () => {
       mounted = false;
     };
-  }, [active, settingsSection, businessId]);
+  }, [active, settingsSection, businessId, usersRefreshKey]);
 
   const Icon = ({ k, active: isActive }: { k: string; active: boolean }) => (
     <svg
@@ -513,6 +537,53 @@ export default function Dashboard() {
                       </tbody>
                     </table>
                   </div>
+
+                  {pendingInvites.length > 0 && (
+                    <div className="mt-8">
+                      <h3 className="text-sm font-medium text-[var(--oe-black)] mb-2">
+                        Pending
+                      </h3>
+                      <div className="overflow-x-auto">
+                        <table className="min-w-full text-sm">
+                          <thead className="text-xs text-gray-500">
+                            <tr>
+                              <th className="text-left px-4 py-2 font-medium">
+                                User
+                              </th>
+                              <th className="text-left px-4 py-2 font-medium">
+                                Email
+                              </th>
+                              <th className="px-4 py-2 font-medium">Role</th>
+                              <th className="px-4 py-2"></th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {pendingInvites.map((p) => (
+                              <tr
+                                key={`pending-${p.email}-${p.invited_at ?? ""}`}
+                                className="hover:bg-black/5"
+                              >
+                                <td className="px-4 py-3 whitespace-nowrap">
+                                  {p.email}
+                                </td>
+                                <td className="px-4 py-3 text-gray-700 whitespace-nowrap">
+                                  {p.email}
+                                </td>
+                                <td className="px-4 py-3 text-gray-700 whitespace-nowrap">
+                                  {formatRoleLabel(p.role)}
+                                </td>
+                                <td className="px-4 py-3 text-right">
+                                  <span className="text-xs text-gray-500">
+                                    Pending
+                                  </span>
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+                  )}
                 </div>
               )}
 
@@ -614,6 +685,9 @@ export default function Dashboard() {
                 }
               );
               if (fnError) throw fnError;
+
+              // Refresh lists so the new pending invite appears immediately
+              setUsersRefreshKey((k) => k + 1);
             }}
           />
         </div>
