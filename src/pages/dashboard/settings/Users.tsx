@@ -21,7 +21,7 @@ export default function Users({ businessId }: { businessId: string }) {
   const [refreshKey, setRefreshKey] = useState(0);
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [inviteToCancel, setInviteToCancel] = useState<string | null>(null);
-  const [openMenuFor, setOpenMenuFor] = useState<string | null>(null);
+  // Inline action buttons; no dropdown state needed
 
   function formatRoleLabel(role: Role): string {
     const s = role.replace("_", " ");
@@ -157,7 +157,7 @@ export default function Users({ businessId }: { businessId: string }) {
         </div>
         {/* Desktop/tablet table */}
         <div className="hidden sm:block overflow-x-auto">
-          <table className="min-w-full text-sm">
+          <table className="min-w-full text-sm table-fixed">
             <thead className="text-xs text-gray-500">
               <tr>
                 <th className="text-left px-4 py-2 font-medium">User</th>
@@ -191,60 +191,66 @@ export default function Users({ businessId }: { businessId: string }) {
                   const canManage = currentUserRole === "admin";
                   const showMenu = canManage && !u.isCurrentUser;
                   return (
-                    <tr key={u.email} className="hover:bg-black/5">
-                      <td className="px-4 py-3 whitespace-nowrap">{u.name}</td>
-                      <td className="px-4 py-3 text-gray-700 whitespace-nowrap">
+                    <tr key={u.email} className="group">
+                      <td className="px-4 py-3 whitespace-nowrap group-hover:bg-black/5 rounded-l-md truncate max-w-[220px]">
+                        {u.name}
+                      </td>
+                      <td className="px-4 py-3 text-gray-700 whitespace-nowrap group-hover:bg-black/5 truncate max-w-[280px]">
                         {u.email}
                       </td>
-                      <td className="px-4 py-3 text-gray-700 whitespace-nowrap">
+                      <td className="px-4 py-3 text-gray-700 whitespace-nowrap group-hover:bg-black/5 truncate max-w-[180px]">
                         {formatRoleLabel(u.role)}
                       </td>
-                      <td className="px-4 py-3 text-right relative">
-                        {showMenu && (
-                          <div className="inline-block text-left">
-                            <button
-                              className="rounded p-2 hover:bg-black/10"
-                              aria-label="User actions"
-                              onClick={() =>
-                                setOpenMenuFor((prev) =>
-                                  prev === u.email ? null : u.email
-                                )
-                              }
-                            >
-                              <svg
-                                className="h-5 w-5 text-gray-700"
-                                viewBox="0 0 24 24"
-                                fill="currentColor"
+                      <td className="px-4 py-3 text-right align-middle group-hover:bg-black/5 rounded-r-md">
+                        <div className="inline-flex items-center justify-end gap-2 h-8">
+                          {showMenu ? (
+                            <>
+                              <button
+                                className="rounded p-2 hover:bg-black/10"
+                                aria-label="Change role"
+                                onClick={() => {
+                                  // TODO: open change role flow
+                                }}
                               >
-                                <circle cx="12" cy="5" r="1.5" />
-                                <circle cx="12" cy="12" r="1.5" />
-                                <circle cx="12" cy="19" r="1.5" />
-                              </svg>
-                            </button>
-                            {openMenuFor === u.email && (
-                              <div className="absolute right-0 mt-2 w-40 rounded-md bg-white shadow-lg ring-1 ring-black/10 z-10">
-                                <button
-                                  className="w-full text-left px-3 py-2 text-xs hover:bg-black/5"
-                                  onClick={() => {
-                                    setOpenMenuFor(null);
-                                    // TODO: open change role flow
-                                  }}
+                                <svg
+                                  className="h-5 w-5 text-gray-700"
+                                  viewBox="0 0 24 24"
+                                  fill="none"
+                                  stroke="currentColor"
+                                  strokeWidth="2"
                                 >
-                                  Change Role
-                                </button>
-                                <button
-                                  className="w-full text-left px-3 py-2 text-xs text-red-600 hover:bg-red-50"
-                                  onClick={() => {
-                                    setOpenMenuFor(null);
-                                    // TODO: open delete confirmation
-                                  }}
+                                  <path d="M20 7h-7" />
+                                  <path d="M13 10l-3-3 3-3" />
+                                  <circle cx="7" cy="12" r="3" />
+                                  <path d="M7 15v4" />
+                                </svg>
+                              </button>
+                              <button
+                                className="rounded p-2 hover:bg-red-50"
+                                aria-label="Delete user"
+                                onClick={() => {
+                                  // TODO: open delete confirmation
+                                }}
+                              >
+                                <svg
+                                  className="h-5 w-5 text-red-600"
+                                  viewBox="0 0 24 24"
+                                  fill="none"
+                                  stroke="currentColor"
+                                  strokeWidth="2"
                                 >
-                                  Delete User
-                                </button>
-                              </div>
-                            )}
-                          </div>
-                        )}
+                                  <polyline points="3 6 5 6 21 6" />
+                                  <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" />
+                                  <path d="M10 11v6" />
+                                  <path d="M14 11v6" />
+                                  <path d="M9 6V4a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v2" />
+                                </svg>
+                              </button>
+                            </>
+                          ) : (
+                            <div className="w-8 h-8" />
+                          )}
+                        </div>
                       </td>
                     </tr>
                   );
@@ -279,48 +285,45 @@ export default function Users({ businessId }: { businessId: string }) {
                       <div className="text-sm text-gray-700">{u.email}</div>
                     </div>
                     {showMenu && (
-                      <div className="relative">
+                      <div className="inline-flex items-center gap-2">
                         <button
                           className="rounded p-2 hover:bg-black/10"
-                          aria-label="User actions"
-                          onClick={() =>
-                            setOpenMenuFor((prev) =>
-                              prev === u.email ? null : u.email
-                            )
-                          }
+                          aria-label="Change role"
+                          onClick={() => {
+                            // TODO: open change role flow
+                          }}
                         >
                           <svg
                             className="h-5 w-5 text-gray-700"
                             viewBox="0 0 24 24"
-                            fill="currentColor"
+                            fill="none"
+                            stroke="currentColor"
+                            strokeWidth="2"
                           >
-                            <circle cx="12" cy="5" r="1.5" />
-                            <circle cx="12" cy="12" r="1.5" />
-                            <circle cx="12" cy="19" r="1.5" />
+                            <path d="M3 12h3l3 8 4-16 3 8h5" />
                           </svg>
                         </button>
-                        {openMenuFor === u.email && (
-                          <div className="absolute right-0 mt-2 w-40 rounded-md bg-white shadow-lg ring-1 ring-black/10 z-10">
-                            <button
-                              className="w-full text-left px-3 py-2 text-xs hover:bg-black/5"
-                              onClick={() => {
-                                setOpenMenuFor(null);
-                                // TODO: open change role flow
-                              }}
-                            >
-                              Change Role
-                            </button>
-                            <button
-                              className="w-full text-left px-3 py-2 text-xs text-red-600 hover:bg-red-50"
-                              onClick={() => {
-                                setOpenMenuFor(null);
-                                // TODO: open delete confirmation
-                              }}
-                            >
-                              Delete User
-                            </button>
-                          </div>
-                        )}
+                        <button
+                          className="rounded p-2 hover:bg-red-50"
+                          aria-label="Delete user"
+                          onClick={() => {
+                            // TODO: open delete confirmation
+                          }}
+                        >
+                          <svg
+                            className="h-5 w-5 text-red-600"
+                            viewBox="0 0 24 24"
+                            fill="none"
+                            stroke="currentColor"
+                            strokeWidth="2"
+                          >
+                            <polyline points="3 6 5 6 21 6" />
+                            <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" />
+                            <path d="M10 11v6" />
+                            <path d="M14 11v6" />
+                            <path d="M9 6V4a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v2" />
+                          </svg>
+                        </button>
                       </div>
                     )}
                   </div>
@@ -343,7 +346,7 @@ export default function Users({ businessId }: { businessId: string }) {
           <>
             {/* Desktop/tablet table */}
             <div className="hidden sm:block overflow-x-auto">
-              <table className="min-w-full text-sm">
+              <table className="min-w-full text-sm table-fixed">
                 <thead className="text-xs text-gray-500">
                   <tr>
                     <th className="text-left px-4 py-2 font-medium">Email</th>
@@ -353,14 +356,14 @@ export default function Users({ businessId }: { businessId: string }) {
                 </thead>
                 <tbody>
                   {pendingInvites.map((p) => (
-                    <tr key={p.id} className="hover:bg-black/5">
-                      <td className="px-4 py-3 text-gray-700 whitespace-nowrap">
+                    <tr key={p.id} className="group">
+                      <td className="px-4 py-3 text-gray-700 whitespace-nowrap group-hover:bg-black/5 rounded-l-md truncate max-w-[320px]">
                         {p.email}
                       </td>
-                      <td className="px-4 py-3 text-gray-700 whitespace-nowrap">
+                      <td className="px-4 py-3 text-gray-700 whitespace-nowrap group-hover:bg-black/5 truncate max-w-[220px]">
                         {formatRoleLabel(p.role)}
                       </td>
-                      <td className="px-4 py-3 text-right">
+                      <td className="px-4 py-3 text-right group-hover:bg-black/5 rounded-r-md">
                         <button
                           className="rounded bg-red-500 text-white px-3 py-1 text-xs hover:bg-red-600"
                           onClick={() => {
@@ -430,6 +433,8 @@ export default function Users({ businessId }: { businessId: string }) {
           setInviteToCancel(null);
         }}
       />
+
+      {/* No floating menu; inline icon actions used instead */}
     </div>
   );
 }
