@@ -42,8 +42,12 @@ export default function Dashboard() {
   const [loading, setLoading] = useState(true);
   const [modalOpen, setModalOpen] = useState(false);
   const [inviteOpen, setInviteOpen] = useState(false);
-  // Refresh key kept for future cross-panel refresh triggers
-  // Removed unused usersRefreshKey; Settings panel manages its own refresh
+  type Role =
+    | "admin"
+    | "inventory_manager"
+    | "ordering_manager"
+    | "sales_manager";
+  const [currentRole, setCurrentRole] = useState<Role>("admin");
 
   useEffect(() => {
     let mounted = true;
@@ -70,7 +74,7 @@ export default function Dashboard() {
       // 2) Otherwise, find a business via user_business_roles (invited users)
       const { data: roleRow } = await supabase
         .from("user_business_roles")
-        .select("business_id")
+        .select("business_id, role")
         .eq("user_id", userId)
         .limit(1)
         .maybeSingle();
@@ -84,6 +88,7 @@ export default function Dashboard() {
         if (!mounted) return;
         setBusinessName(biz?.business_name || "");
         setBusinessId(biz?.id || "");
+        if (roleRow?.role) setCurrentRole(roleRow.role as Role);
         setLoading(false);
         return;
       }
@@ -98,6 +103,52 @@ export default function Dashboard() {
       mounted = false;
     };
   }, []);
+
+  // Ensure role when businessId known (owner => admin)
+  useEffect(() => {
+    let mounted = true;
+    async function loadRole() {
+      const { data: sessionData } = await supabase.auth.getSession();
+      const userId = sessionData.session?.user.id;
+      if (!userId || !businessId) return;
+      const { data: owned } = await supabase
+        .from("businesses")
+        .select("id")
+        .eq("id", businessId)
+        .eq("created_by_user", userId)
+        .maybeSingle();
+      if (owned) {
+        if (mounted) setCurrentRole("admin");
+        return;
+      }
+      const { data: roleRow } = await supabase
+        .from("user_business_roles")
+        .select("role")
+        .eq("user_id", userId)
+        .eq("business_id", businessId)
+        .maybeSingle();
+      if (mounted && roleRow?.role) setCurrentRole(roleRow.role as Role);
+    }
+    loadRole();
+    return () => {
+      mounted = false;
+    };
+  }, [businessId]);
+
+  // Enforce allowed menu for role
+  useEffect(() => {
+    const allowed: Record<Role, string[]> = {
+      admin: ["overview", "inventory", "ordering", "analytics"],
+      inventory_manager: ["inventory"],
+      ordering_manager: ["ordering"],
+      sales_manager: ["analytics"],
+    };
+    if (active === "settings") return;
+    const allowedKeys = allowed[currentRole];
+    if (!allowedKeys.includes(active)) {
+      setActive(allowedKeys[0]);
+    }
+  }, [currentRole, active]);
 
   useEffect(() => {
     try {
@@ -182,21 +233,32 @@ export default function Dashboard() {
           )}
         </div>
         <nav className="px-2 py-3 space-y-1">
-          {items.map((it) => (
-            <button
-              key={it.key}
-              onClick={() => {
-                setActive(it.key);
-                setSettingsOpen(false);
-              }}
-              className={`w-full text-left flex items-center gap-3 rounded-md px-3 py-2 transition ${
-                active === it.key ? "bg-white/10" : "hover:bg-white/5"
-              }`}
-            >
-              <Icon k={it.key} active={active === it.key} />
-              {!collapsed && <span>{it.label}</span>}
-            </button>
-          ))}
+          {items
+            .filter((it) => {
+              if (currentRole === "admin") return true;
+              if (currentRole === "inventory_manager")
+                return it.key === "inventory";
+              if (currentRole === "ordering_manager")
+                return it.key === "ordering";
+              if (currentRole === "sales_manager")
+                return it.key === "analytics";
+              return true;
+            })
+            .map((it) => (
+              <button
+                key={it.key}
+                onClick={() => {
+                  setActive(it.key);
+                  setSettingsOpen(false);
+                }}
+                className={`w-full text-left flex items-center gap-3 rounded-md px-3 py-2 transition ${
+                  active === it.key ? "bg-white/10" : "hover:bg-white/5"
+                }`}
+              >
+                <Icon k={it.key} active={active === it.key} />
+                {!collapsed && <span>{it.label}</span>}
+              </button>
+            ))}
 
           {/* Settings dropdown */}
           <div>
