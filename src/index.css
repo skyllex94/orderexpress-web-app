@@ -53,3 +53,16 @@ body {
     border-color: var(--oe-border);
   }
 }
+
+@layer base {
+  button,
+  [type="button"],
+  [type="submit"],
+  [type="reset"],
+  [role="button"],
+  a,
+  label[for],
+  summary {
+    cursor: pointer;
+  }
+}
