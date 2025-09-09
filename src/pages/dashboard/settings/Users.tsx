@@ -21,6 +21,7 @@ export default function Users({ businessId }: { businessId: string }) {
   const [refreshKey, setRefreshKey] = useState(0);
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [inviteToCancel, setInviteToCancel] = useState<string | null>(null);
+  const [openMenuFor, setOpenMenuFor] = useState<string | null>(null);
 
   function formatRoleLabel(role: Role): string {
     const s = role.replace("_", " ");
@@ -183,25 +184,71 @@ export default function Users({ businessId }: { businessId: string }) {
                 </tr>
               )}
               {!usersLoading &&
-                users.map((u) => (
-                  <tr key={u.email} className="hover:bg-black/5">
-                    <td className="px-4 py-3 whitespace-nowrap">{u.name}</td>
-                    <td className="px-4 py-3 text-gray-700 whitespace-nowrap">
-                      {u.email}
-                    </td>
-                    <td className="px-4 py-3 text-gray-700 whitespace-nowrap">
-                      {formatRoleLabel(u.role)}
-                    </td>
-                    <td className="px-4 py-3 text-right">
-                      <button
-                        className="rounded bg-black/5 px-3 py-1 text-xs text-gray-700"
-                        disabled={u.isCurrentUser}
-                      >
-                        Update
-                      </button>
-                    </td>
-                  </tr>
-                ))}
+                users.map((u) => {
+                  const currentUserRole = users.find(
+                    (x) => x.isCurrentUser
+                  )?.role;
+                  const canManage = currentUserRole === "admin";
+                  const showMenu = canManage && !u.isCurrentUser;
+                  return (
+                    <tr key={u.email} className="hover:bg-black/5">
+                      <td className="px-4 py-3 whitespace-nowrap">{u.name}</td>
+                      <td className="px-4 py-3 text-gray-700 whitespace-nowrap">
+                        {u.email}
+                      </td>
+                      <td className="px-4 py-3 text-gray-700 whitespace-nowrap">
+                        {formatRoleLabel(u.role)}
+                      </td>
+                      <td className="px-4 py-3 text-right relative">
+                        {showMenu && (
+                          <div className="inline-block text-left">
+                            <button
+                              className="rounded p-2 hover:bg-black/10"
+                              aria-label="User actions"
+                              onClick={() =>
+                                setOpenMenuFor((prev) =>
+                                  prev === u.email ? null : u.email
+                                )
+                              }
+                            >
+                              <svg
+                                className="h-5 w-5 text-gray-700"
+                                viewBox="0 0 24 24"
+                                fill="currentColor"
+                              >
+                                <circle cx="12" cy="5" r="1.5" />
+                                <circle cx="12" cy="12" r="1.5" />
+                                <circle cx="12" cy="19" r="1.5" />
+                              </svg>
+                            </button>
+                            {openMenuFor === u.email && (
+                              <div className="absolute right-0 mt-2 w-40 rounded-md bg-white shadow-lg ring-1 ring-black/10 z-10">
+                                <button
+                                  className="w-full text-left px-3 py-2 text-xs hover:bg-black/5"
+                                  onClick={() => {
+                                    setOpenMenuFor(null);
+                                    // TODO: open change role flow
+                                  }}
+                                >
+                                  Change Role
+                                </button>
+                                <button
+                                  className="w-full text-left px-3 py-2 text-xs text-red-600 hover:bg-red-50"
+                                  onClick={() => {
+                                    setOpenMenuFor(null);
+                                    // TODO: open delete confirmation
+                                  }}
+                                >
+                                  Delete User
+                                </button>
+                              </div>
+                            )}
+                          </div>
+                        )}
+                      </td>
+                    </tr>
+                  );
+                })}
             </tbody>
           </table>
         </div>
@@ -215,28 +262,74 @@ export default function Users({ businessId }: { businessId: string }) {
             <div className="text-sm text-gray-600">No users found.</div>
           )}
           {!usersLoading &&
-            users.map((u) => (
-              <div
-                key={u.email}
-                className="rounded-xl border border-black/10 p-4"
-              >
-                <div className="font-medium text-[var(--oe-black)]">
-                  {u.name}
+            users.map((u) => {
+              const currentUserRole = users.find((x) => x.isCurrentUser)?.role;
+              const canManage = currentUserRole === "admin";
+              const showMenu = canManage && !u.isCurrentUser;
+              return (
+                <div
+                  key={u.email}
+                  className="rounded-xl border border-black/10 p-4"
+                >
+                  <div className="flex items-start justify-between">
+                    <div>
+                      <div className="font-medium text-[var(--oe-black)]">
+                        {u.name}
+                      </div>
+                      <div className="text-sm text-gray-700">{u.email}</div>
+                    </div>
+                    {showMenu && (
+                      <div className="relative">
+                        <button
+                          className="rounded p-2 hover:bg-black/10"
+                          aria-label="User actions"
+                          onClick={() =>
+                            setOpenMenuFor((prev) =>
+                              prev === u.email ? null : u.email
+                            )
+                          }
+                        >
+                          <svg
+                            className="h-5 w-5 text-gray-700"
+                            viewBox="0 0 24 24"
+                            fill="currentColor"
+                          >
+                            <circle cx="12" cy="5" r="1.5" />
+                            <circle cx="12" cy="12" r="1.5" />
+                            <circle cx="12" cy="19" r="1.5" />
+                          </svg>
+                        </button>
+                        {openMenuFor === u.email && (
+                          <div className="absolute right-0 mt-2 w-40 rounded-md bg-white shadow-lg ring-1 ring-black/10 z-10">
+                            <button
+                              className="w-full text-left px-3 py-2 text-xs hover:bg-black/5"
+                              onClick={() => {
+                                setOpenMenuFor(null);
+                                // TODO: open change role flow
+                              }}
+                            >
+                              Change Role
+                            </button>
+                            <button
+                              className="w-full text-left px-3 py-2 text-xs text-red-600 hover:bg-red-50"
+                              onClick={() => {
+                                setOpenMenuFor(null);
+                                // TODO: open delete confirmation
+                              }}
+                            >
+                              Delete User
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                  <div className="mt-2 text-sm text-gray-800">
+                    Role: {formatRoleLabel(u.role)}
+                  </div>
                 </div>
-                <div className="text-sm text-gray-700">{u.email}</div>
-                <div className="mt-2 text-sm text-gray-800">
-                  Role: {formatRoleLabel(u.role)}
-                </div>
-                <div className="mt-3 flex justify-end">
-                  <button
-                    className="rounded bg-black/5 px-3 py-1 text-xs text-gray-700"
-                    disabled={u.isCurrentUser}
-                  >
-                    Update
-                  </button>
-                </div>
-              </div>
-            ))}
+              );
+            })}
         </div>
       </div>
 
