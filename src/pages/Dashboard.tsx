@@ -7,7 +7,7 @@ import Overview from "./dashboard/Overview";
 import Inventory from "./dashboard/Inventory";
 import Ordering from "./dashboard/Ordering";
 import Analytics from "./dashboard/Analytics";
-import Settings from "./dashboard/Settings";
+import SettingsPanel from "./dashboard/Settings";
 
 type SidebarItem = {
   key: string;
@@ -21,11 +21,7 @@ const items: SidebarItem[] = [
   { key: "analytics", label: "Analytics" },
 ];
 
-type Role =
-  | "admin"
-  | "inventory_manager"
-  | "ordering_manager"
-  | "sales_manager";
+// Role type is managed within Settings panel now
 
 export default function Dashboard() {
   const navigate = useNavigate();
@@ -46,24 +42,8 @@ export default function Dashboard() {
   const [loading, setLoading] = useState(true);
   const [modalOpen, setModalOpen] = useState(false);
   const [inviteOpen, setInviteOpen] = useState(false);
-  const [users, setUsers] = useState<
-    {
-      name: string;
-      email: string;
-      isCurrentUser: boolean;
-      role: Role;
-    }[]
-  >([]);
-  const [usersLoading, setUsersLoading] = useState(false);
-  const [pendingInvites, setPendingInvites] = useState<
-    { email: string; role: Role; invited_at?: string | null }[]
-  >([]);
-  const [usersRefreshKey, setUsersRefreshKey] = useState<number>(0);
-
-  function formatRoleLabel(role: Role): string {
-    const s = role.replace("_", " ");
-    return s.charAt(0).toUpperCase() + s.slice(1);
-  }
+  // Refresh key kept for future cross-panel refresh triggers
+  // Removed unused usersRefreshKey; Settings panel manages its own refresh
 
   useEffect(() => {
     let mounted = true;
@@ -127,116 +107,7 @@ export default function Dashboard() {
     }
   }, [collapsed]);
 
-  // Load users and pending invites for current business for Settings > Users
-  useEffect(() => {
-    if (active !== "settings" || settingsSection !== "users") return;
-    let mounted = true;
-    async function loadUsers() {
-      setUsersLoading(true);
-      try {
-        const { data: userResp, error } = await supabase.auth.getUser();
-        if (error) return;
-        const current = userResp.user;
-        if (!current) return;
-        const meta = (current.user_metadata ?? {}) as Record<string, unknown>;
-        const first =
-          typeof meta["first_name"] === "string"
-            ? (meta["first_name"] as string)
-            : undefined;
-        const last =
-          typeof meta["last_name"] === "string"
-            ? (meta["last_name"] as string)
-            : undefined;
-        const fullName = [first, last].filter(Boolean).join(" ") || "Owner";
-
-        let list: {
-          name: string;
-          email: string;
-          isCurrentUser: boolean;
-          role: Role;
-        }[] = [];
-
-        if (businessId) {
-          // Try RPC that joins user metadata from auth.users
-          const { data: members, error: rpcErr } = await supabase.rpc(
-            "get_business_users",
-            { p_business_id: businessId }
-          );
-          if (!rpcErr && Array.isArray(members)) {
-            list = members.map(
-              (m: {
-                user_id: string;
-                email: string | null;
-                first_name: string | null;
-                last_name: string | null;
-                role: Role | string;
-              }) => {
-                const isSelf = m.user_id === current.id;
-                const name =
-                  [m.first_name, m.last_name]
-                    .filter((v): v is string => Boolean(v))
-                    .join(" ") ||
-                  m.email ||
-                  "User";
-                return {
-                  name,
-                  email: m.email || "",
-                  isCurrentUser: isSelf,
-                  role: (m.role as Role) ?? "inventory_manager",
-                };
-              }
-            );
-          } else {
-            // Fallback: roles only; use current user details, placeholders for others
-            const { data: roleRows } = await supabase
-              .from("user_business_roles")
-              .select("user_id, role")
-              .eq("business_id", businessId);
-            if (roleRows && Array.isArray(roleRows)) {
-              for (const row of roleRows) {
-                const isSelf = row.user_id === current.id;
-                list.push({
-                  name: isSelf ? fullName : "User",
-                  email: isSelf ? current.email || "" : "—",
-                  isCurrentUser: isSelf,
-                  role: (row.role as Role) ?? "inventory_manager",
-                });
-              }
-            }
-          }
-        }
-
-        if (!mounted) return;
-        setUsers(list);
-
-        // Load pending invitations for this business
-        if (businessId) {
-          const { data: pending } = await supabase
-            .from("invitations")
-            .select("email, role, invited_at, status")
-            .eq("business_id", businessId)
-            .eq("status", "pending")
-            .order("invited_at", { ascending: true });
-          if (!mounted) return;
-          setPendingInvites(
-            (pending || []).map((p) => ({
-              email: p.email as string,
-              role: (p.role as Role) ?? ("inventory_manager" as Role),
-              invited_at: (p.invited_at as string) ?? null,
-            }))
-          );
-        } else {
-          setPendingInvites([]);
-        }
-      } finally {
-        if (mounted) setUsersLoading(false);
-      }
-    }
-    loadUsers();
-    return () => {
-      mounted = false;
-    };
-  }, [active, settingsSection, businessId, usersRefreshKey]);
+  // Settings page content moved to SettingsPanel
 
   const Icon = ({ k, active: isActive }: { k: string; active: boolean }) => (
     <svg
@@ -464,146 +335,10 @@ export default function Dashboard() {
           {active === "inventory" && <Inventory />}
           {active === "ordering" && <Ordering />}
           {active === "analytics" && <Analytics />}
-          {active === "settings" && <Settings />}
-
           {active === "settings" && (
-            <div className="space-y-6">
-              <h1 className="text-2xl font-semibold text-[var(--oe-black)]">
-                Settings
-              </h1>
-
-              {settingsSection === "users" && (
-                <div className="rounded-2xl bg-white p-6">
-                  <div className="pb-4 flex items-center justify-between">
-                    <h2 className="font-medium">Users</h2>
-                    <button
-                      onClick={() => setInviteOpen(true)}
-                      className="rounded-md bg-[var(--oe-green)] px-3 py-2 text-black text-sm hover:opacity-90"
-                    >
-                      Invite user
-                    </button>
-                  </div>
-                  <div className="overflow-x-auto">
-                    <table className="min-w-full text-sm">
-                      <thead className="text-xs text-gray-500">
-                        <tr>
-                          <th className="text-left px-4 py-2 font-medium">
-                            User
-                          </th>
-                          <th className="text-left px-4 py-2 font-medium">
-                            Email
-                          </th>
-                          <th className="px-4 py-2 font-medium">Role</th>
-                          <th className="px-4 py-2"></th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {usersLoading && (
-                          <tr>
-                            <td className="px-4 py-3 text-gray-600" colSpan={8}>
-                              Loading users…
-                            </td>
-                          </tr>
-                        )}
-                        {!usersLoading && users.length === 0 && (
-                          <tr>
-                            <td className="px-4 py-3 text-gray-600" colSpan={8}>
-                              No users found.
-                            </td>
-                          </tr>
-                        )}
-                        {!usersLoading &&
-                          users.map((u) => (
-                            <tr key={u.email} className="hover:bg-black/5">
-                              <td className="px-4 py-3 whitespace-nowrap">
-                                {u.name}
-                              </td>
-                              <td className="px-4 py-3 text-gray-700 whitespace-nowrap">
-                                {u.email}
-                              </td>
-                              <td className="px-4 py-3 text-gray-700 whitespace-nowrap">
-                                {formatRoleLabel(u.role)}
-                              </td>
-                              <td className="px-4 py-3 text-right">
-                                <button
-                                  className="rounded bg-black/5 px-3 py-1 text-xs text-gray-700"
-                                  disabled={u.isCurrentUser}
-                                >
-                                  Update
-                                </button>
-                              </td>
-                            </tr>
-                          ))}
-                      </tbody>
-                    </table>
-                  </div>
-
-                  {pendingInvites.length > 0 && (
-                    <div className="mt-8">
-                      <h3 className="text-sm font-medium text-[var(--oe-black)] mb-2">
-                        Pending
-                      </h3>
-                      <div className="overflow-x-auto">
-                        <table className="min-w-full text-sm">
-                          <thead className="text-xs text-gray-500">
-                            <tr>
-                              <th className="text-left px-4 py-2 font-medium">
-                                User
-                              </th>
-                              <th className="text-left px-4 py-2 font-medium">
-                                Email
-                              </th>
-                              <th className="px-4 py-2 font-medium">Role</th>
-                              <th className="px-4 py-2"></th>
-                            </tr>
-                          </thead>
-                          <tbody>
-                            {pendingInvites.map((p) => (
-                              <tr
-                                key={`pending-${p.email}-${p.invited_at ?? ""}`}
-                                className="hover:bg-black/5"
-                              >
-                                <td className="px-4 py-3 whitespace-nowrap">
-                                  {p.email}
-                                </td>
-                                <td className="px-4 py-3 text-gray-700 whitespace-nowrap">
-                                  {p.email}
-                                </td>
-                                <td className="px-4 py-3 text-gray-700 whitespace-nowrap">
-                                  {formatRoleLabel(p.role)}
-                                </td>
-                                <td className="px-4 py-3 text-right">
-                                  <span className="text-xs text-gray-500">
-                                    Pending
-                                  </span>
-                                </td>
-                              </tr>
-                            ))}
-                          </tbody>
-                        </table>
-                      </div>
-                    </div>
-                  )}
-                </div>
-              )}
-
-              {settingsSection === "plan" && (
-                <div className="rounded-2xl bg-white p-6 text-gray-700">
-                  Plan & Billing (coming soon)
-                </div>
-              )}
-              {settingsSection === "account" && (
-                <div className="rounded-2xl bg-white p-6 text-gray-700">
-                  Account Settings (coming soon)
-                </div>
-              )}
-              {!settingsSection && (
-                <p className="text-gray-600">
-                  Choose a settings section from the sidebar.
-                </p>
-              )}
-            </div>
+            <SettingsPanel businessId={businessId} section={settingsSection} />
           )}
+
           <AddBusinessModal
             isOpen={modalOpen}
             onClose={() => setModalOpen(false)}
@@ -686,8 +421,7 @@ export default function Dashboard() {
               );
               if (fnError) throw fnError;
 
-              // Refresh lists so the new pending invite appears immediately
-              setUsersRefreshKey((k) => k + 1);
+              // Settings panel handles its own refresh; no-op here
             }}
           />
         </div>

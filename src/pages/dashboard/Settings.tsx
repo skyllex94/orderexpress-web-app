@@ -1,12 +1,269 @@
-export default function Settings() {
+import { useEffect, useState } from "react";
+import { supabase } from "../../services/supabase";
+import InviteUserModal from "../../components/InviteUserModal";
+
+type Role =
+  | "admin"
+  | "inventory_manager"
+  | "ordering_manager"
+  | "sales_manager";
+
+export default function Settings({
+  businessId,
+  section,
+}: {
+  businessId: string;
+  section: "plan" | "users" | "account" | null;
+}) {
+  const [inviteOpen, setInviteOpen] = useState(false);
+  const [usersLoading, setUsersLoading] = useState(false);
+  const [users, setUsers] = useState<
+    { name: string; email: string; isCurrentUser: boolean; role: Role }[]
+  >([]);
+  const [pendingInvites, setPendingInvites] = useState<
+    { email: string; role: Role; invited_at?: string | null }[]
+  >([]);
+  const [refreshKey, setRefreshKey] = useState(0);
+
+  function formatRoleLabel(role: Role): string {
+    const s = role.replace("_", " ");
+    return s.charAt(0).toUpperCase() + s.slice(1);
+  }
+
+  useEffect(() => {
+    if (section !== "users") return;
+    let mounted = true;
+    async function load() {
+      setUsersLoading(true);
+      try {
+        const { data: userResp, error } = await supabase.auth.getUser();
+        if (error) return;
+        const current = userResp.user;
+        if (!current) return;
+
+        let list: {
+          name: string;
+          email: string;
+          isCurrentUser: boolean;
+          role: Role;
+        }[] = [];
+        if (businessId) {
+          const { data: members } = await supabase.rpc("get_business_users", {
+            p_business_id: businessId,
+          });
+          if (Array.isArray(members)) {
+            list = members.map(
+              (m: {
+                user_id: string;
+                email: string | null;
+                first_name: string | null;
+                last_name: string | null;
+                role: Role | string;
+              }) => {
+                const isSelf = m.user_id === current.id;
+                const name =
+                  [m.first_name, m.last_name]
+                    .filter((v): v is string => Boolean(v))
+                    .join(" ") ||
+                  m.email ||
+                  "User";
+                return {
+                  name,
+                  email: m.email || "",
+                  isCurrentUser: isSelf,
+                  role: (m.role as Role) ?? "inventory_manager",
+                };
+              }
+            );
+          }
+
+          const { data: pending } = await supabase
+            .from("invitations")
+            .select("email, role, invited_at, status")
+            .eq("business_id", businessId)
+            .eq("status", "pending")
+            .order("invited_at", { ascending: true });
+          if (mounted) {
+            setPendingInvites(
+              (pending || []).map((p) => ({
+                email: p.email as string,
+                role: (p.role as Role) ?? ("inventory_manager" as Role),
+                invited_at: (p.invited_at as string) ?? null,
+              }))
+            );
+          }
+        }
+        if (mounted) setUsers(list);
+      } finally {
+        if (mounted) setUsersLoading(false);
+      }
+    }
+    load();
+    return () => {
+      mounted = false;
+    };
+  }, [section, businessId, refreshKey]);
+
+  async function handleInvite(email: string, role: Role) {
+    if (!businessId) throw new Error("Please create/select a business first.");
+    const { data: sessionData } = await supabase.auth.getSession();
+    const userId = sessionData.session?.user.id;
+    if (!userId) throw new Error("You must be logged in to invite users.");
+    const token = (globalThis.crypto?.randomUUID?.() ??
+      Math.random().toString(36).slice(2)) as string;
+    const { error: insertError } = await supabase.from("invitations").insert({
+      business_id: businessId,
+      email,
+      role,
+      token,
+      invited_by: userId,
+      status: "pending",
+    });
+    if (insertError) throw insertError;
+    const acceptUrl = `${window.location.origin}/accept-invite?token=${token}`;
+    const subject = "You’re invited to OrderExpress";
+    const text = `You’ve been invited to OrderExpress. Open this link to accept: ${acceptUrl}`;
+    const html = `<p>You’ve been invited to <strong>OrderExpress</strong>.</p>
+      <p>Role: <strong>${role.replace("_", " ")}</strong></p>
+      <p><a href="${acceptUrl}">Accept Invitation</a></p>`;
+    const { error: fnError } = await supabase.functions.invoke(
+      "send-invite-email",
+      {
+        body: { to: email, subject, text, html },
+      }
+    );
+    if (fnError) throw fnError;
+    setRefreshKey((k) => k + 1);
+  }
+
   return (
-    <div className="space-y-2">
-      <h1 className="text-2xl font-semibold text-[var(--oe-black)]">
-        Settings
-      </h1>
-      <p className="text-gray-600">
-        Configure your account and workspace settings.
-      </p>
+    <div className="space-y-6">
+      {section === "users" && (
+        <>
+          <div className="rounded-2xl bg-white p-6">
+            <div className="pb-4 flex items-center justify-between">
+              <h2 className="font-medium">Users</h2>
+              <button
+                onClick={() => setInviteOpen(true)}
+                className="rounded-md bg-[var(--oe-green)] px-3 py-2 text-black text-sm hover:opacity-90"
+              >
+                Invite user
+              </button>
+            </div>
+            <div className="overflow-x-auto">
+              <table className="min-w-full text-sm">
+                <thead className="text-xs text-gray-500">
+                  <tr>
+                    <th className="text-left px-4 py-2 font-medium">User</th>
+                    <th className="text-left px-4 py-2 font-medium">Email</th>
+                    <th className="px-4 py-2 font-medium">Role</th>
+                    <th className="px-4 py-2"></th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {usersLoading && (
+                    <tr>
+                      <td className="px-4 py-3 text-gray-600" colSpan={8}>
+                        Loading users…
+                      </td>
+                    </tr>
+                  )}
+                  {!usersLoading && users.length === 0 && (
+                    <tr>
+                      <td className="px-4 py-3 text-gray-600" colSpan={8}>
+                        No users found.
+                      </td>
+                    </tr>
+                  )}
+                  {!usersLoading &&
+                    users.map((u) => (
+                      <tr key={u.email} className="hover:bg-black/5">
+                        <td className="px-4 py-3 whitespace-nowrap">
+                          {u.name}
+                        </td>
+                        <td className="px-4 py-3 text-gray-700 whitespace-nowrap">
+                          {u.email}
+                        </td>
+                        <td className="px-4 py-3 text-gray-700 whitespace-nowrap">
+                          {formatRoleLabel(u.role)}
+                        </td>
+                        <td className="px-4 py-3 text-right">
+                          <button
+                            className="rounded bg-black/5 px-3 py-1 text-xs text-gray-700"
+                            disabled={u.isCurrentUser}
+                          >
+                            Update
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <div className="rounded-2xl bg-white p-6">
+            <div className="pb-4 flex items-center justify-between">
+              <h3 className="font-medium">Pending</h3>
+            </div>
+            {pendingInvites.length === 0 ? (
+              <p className="text-sm text-gray-600">No pending invitations.</p>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="min-w-full text-sm">
+                  <thead className="text-xs text-gray-500">
+                    <tr>
+                      <th className="text-left px-4 py-2 font-medium">Email</th>
+                      <th className="px-4 py-2 font-medium">Role</th>
+                      <th className="px-4 py-2"></th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {pendingInvites.map((p) => (
+                      <tr
+                        key={`pending-${p.email}-${p.invited_at ?? ""}`}
+                        className="hover:bg-black/5"
+                      >
+                        <td className="px-4 py-3 text-gray-700 whitespace-nowrap">
+                          {p.email}
+                        </td>
+                        <td className="px-4 py-3 text-gray-700 whitespace-nowrap">
+                          {formatRoleLabel(p.role)}
+                        </td>
+                        <td className="px-4 py-3 text-right">
+                          <span className="text-xs text-gray-500">Pending</span>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+
+          <InviteUserModal
+            isOpen={inviteOpen}
+            onClose={() => setInviteOpen(false)}
+            onInvite={({ email, role }) => handleInvite(email, role as Role)}
+          />
+        </>
+      )}
+
+      {section === "plan" && (
+        <div className="rounded-2xl bg-white p-6 text-gray-700">
+          Plan & Billing (coming soon)
+        </div>
+      )}
+      {section === "account" && (
+        <div className="rounded-2xl bg-white p-6 text-gray-700">
+          Account Settings (coming soon)
+        </div>
+      )}
+      {!section && (
+        <p className="text-gray-600">
+          Choose a settings section from the sidebar.
+        </p>
+      )}
     </div>
   );
 }
