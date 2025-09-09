@@ -67,6 +67,29 @@ export default function Dashboard() {
       const { data: sessionData } = await supabase.auth.getSession();
       const userId = sessionData.session?.user.id;
       if (!userId) return;
+      // Prefer last selected business from localStorage if accessible
+      try {
+        const storedId = localStorage.getItem("oe_current_business_id");
+        if (storedId) {
+          const { data: storedBiz } = await supabase
+            .from("businesses")
+            .select("id, business_name")
+            .eq("id", storedId)
+            .maybeSingle();
+          if (storedBiz) {
+            if (!mounted) return;
+            setBusinessName(storedBiz.business_name || "");
+            setBusinessId(storedBiz.id || "");
+            setLoading(false);
+            return;
+          } else {
+            // Clear invalid id
+            localStorage.removeItem("oe_current_business_id");
+          }
+        }
+      } catch {
+        /* ignore */
+      }
       // 1) Try businesses the user created/owns
       const { data: ownBiz } = await supabase
         .from("businesses")
@@ -79,6 +102,11 @@ export default function Dashboard() {
         if (!mounted) return;
         setBusinessName(ownBiz.business_name || "");
         setBusinessId(ownBiz.id || "");
+        try {
+          localStorage.setItem("oe_current_business_id", ownBiz.id || "");
+        } catch {
+          /* ignore */
+        }
         setLoading(false);
         return;
       }
@@ -101,6 +129,11 @@ export default function Dashboard() {
         setBusinessName(biz?.business_name || "");
         setBusinessId(biz?.id || "");
         if (roleRow?.role) setCurrentRole(roleRow.role as Role);
+        try {
+          if (biz?.id) localStorage.setItem("oe_current_business_id", biz.id);
+        } catch {
+          /* ignore */
+        }
         setLoading(false);
         return;
       }
@@ -501,6 +534,14 @@ export default function Dashboard() {
               if (ownBiz) {
                 setBusinessName(ownBiz.business_name || "");
                 setBusinessId(ownBiz.id || "");
+                try {
+                  localStorage.setItem(
+                    "oe_current_business_id",
+                    ownBiz.id || ""
+                  );
+                } catch {
+                  /* ignore */
+                }
                 return;
               }
               const { data: roleRow } = await supabase
@@ -517,6 +558,12 @@ export default function Dashboard() {
                   .maybeSingle();
                 setBusinessName(biz?.business_name || "");
                 setBusinessId(biz?.id || "");
+                try {
+                  if (biz?.id)
+                    localStorage.setItem("oe_current_business_id", biz.id);
+                } catch {
+                  /* ignore */
+                }
               }
             }}
           />
@@ -691,6 +738,14 @@ export default function Dashboard() {
             // Update current business context
             setBusinessId(switchCandidate.id);
             setBusinessName(switchCandidate.business_name);
+            try {
+              localStorage.setItem(
+                "oe_current_business_id",
+                switchCandidate.id
+              );
+            } catch {
+              /* ignore */
+            }
             // Optionally close the drawer after switching
             setBusinessDrawerOpen(false);
           } finally {

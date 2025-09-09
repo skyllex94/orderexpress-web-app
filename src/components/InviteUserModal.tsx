@@ -37,7 +37,9 @@ export default function InviteUserModal({
       onClose();
     } catch (err) {
       const message =
-        err instanceof Error ? err.message : "Could not send invitation.";
+        err instanceof Error
+          ? err.message
+          : "Could not send invitation. User may not have suffient permissions.";
       setErrorMessage(message);
     } finally {
       setSubmitting(false);
