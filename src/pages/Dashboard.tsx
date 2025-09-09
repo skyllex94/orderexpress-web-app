@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "../services/supabase";
+import ConfirmModal from "../components/ConfirmModal";
 import AddBusinessModal from "../components/AddBusinessModal";
 import InviteUserModal from "../components/InviteUserModal";
 import Overview from "./dashboard/Overview";
@@ -47,6 +48,12 @@ export default function Dashboard() {
     { id: string; business_name: string }[]
   >([]);
   const [bizLoading, setBizLoading] = useState(false);
+  const [switchConfirmOpen, setSwitchConfirmOpen] = useState(false);
+  const [switching, setSwitching] = useState(false);
+  const [switchCandidate, setSwitchCandidate] = useState<{
+    id: string;
+    business_name: string;
+  } | null>(null);
   type Role =
     | "admin"
     | "inventory_manager"
@@ -638,21 +645,66 @@ export default function Dashboard() {
             )}
             {!bizLoading &&
               allBusinesses.map((b) => (
-                <div
+                <button
                   key={b.id}
-                  className={`rounded-md border border-[color:var(--oe-border)] p-3 ${
-                    b.id === businessId ? "bg-white/5" : "hover:bg-white/5"
+                  onClick={() => {
+                    if (b.id === businessId) return;
+                    setSwitchCandidate(b);
+                    setSwitchConfirmOpen(true);
+                  }}
+                  className={`w-full text-left rounded-md border border-[color:var(--oe-border)] p-3 transition ${
+                    b.id === businessId
+                      ? "bg-white/5 cursor-default"
+                      : "hover:bg-white/5"
                   }`}
                 >
                   <div className="font-medium truncate">{b.business_name}</div>
                   {b.id === businessId && (
                     <div className="text-xs text-gray-400 mt-1">Current</div>
                   )}
-                </div>
+                </button>
               ))}
           </div>
         </div>
       </div>
+      <ConfirmModal
+        isOpen={switchConfirmOpen}
+        title="Switch business?"
+        message={
+          switching ? (
+            <div className="flex items-center gap-3">
+              <div className="h-5 w-5 rounded-full border-2 border-black/10 border-t-[var(--oe-green)] animate-spin" />
+              <span>Switching…</span>
+            </div>
+          ) : (
+            <span>
+              Switch to <strong>{switchCandidate?.business_name}</strong>?
+            </span>
+          )
+        }
+        confirmLabel="Switch"
+        cancelLabel="Cancel"
+        onConfirm={async () => {
+          if (!switchCandidate) return;
+          setSwitching(true);
+          try {
+            // Update current business context
+            setBusinessId(switchCandidate.id);
+            setBusinessName(switchCandidate.business_name);
+            // Optionally close the drawer after switching
+            setBusinessDrawerOpen(false);
+          } finally {
+            setSwitching(false);
+            setSwitchConfirmOpen(false);
+            setSwitchCandidate(null);
+          }
+        }}
+        onClose={() => {
+          if (switching) return; // prevent closing while switching
+          setSwitchConfirmOpen(false);
+          setSwitchCandidate(null);
+        }}
+      />
     </div>
   );
 }

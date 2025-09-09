@@ -26,6 +26,7 @@ export default function AddBusinessModal({
 
   async function handleCreate(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
+    if (submitting) return;
     setErrorMessage(null);
     if (!businessName || !address1 || !city || !zip) {
       setErrorMessage("Please complete the required fields.");
@@ -68,13 +69,6 @@ export default function AddBusinessModal({
       const businessId = biz?.id as string | undefined;
       if (!businessId) {
         setErrorMessage("Failed to create business. Please try again.");
-        return;
-      }
-      const { error: roleError } = await supabase
-        .from("user_business_roles")
-        .insert({ user_id: userId, business_id: businessId, role: "admin" });
-      if (roleError) {
-        setErrorMessage(roleError.message);
         return;
       }
       onCreated?.();
