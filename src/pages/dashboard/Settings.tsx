@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { supabase } from "../../services/supabase";
 import InviteUserModal from "../../components/InviteUserModal";
+import ConfirmModal from "../../components/ConfirmModal";
 
 type Role =
   | "admin"
@@ -21,9 +22,11 @@ export default function Settings({
     { name: string; email: string; isCurrentUser: boolean; role: Role }[]
   >([]);
   const [pendingInvites, setPendingInvites] = useState<
-    { email: string; role: Role; invited_at?: string | null }[]
+    { id: string; email: string; role: Role; invited_at?: string | null }[]
   >([]);
   const [refreshKey, setRefreshKey] = useState(0);
+  const [confirmOpen, setConfirmOpen] = useState(false);
+  const [inviteToCancel, setInviteToCancel] = useState<string | null>(null);
 
   function formatRoleLabel(role: Role): string {
     const s = role.replace("_", " ");
@@ -79,13 +82,14 @@ export default function Settings({
 
           const { data: pending } = await supabase
             .from("invitations")
-            .select("email, role, invited_at, status")
+            .select("id, email, role, invited_at, status")
             .eq("business_id", businessId)
             .eq("status", "pending")
             .order("invited_at", { ascending: true });
           if (mounted) {
             setPendingInvites(
               (pending || []).map((p) => ({
+                id: p.id as string,
                 email: p.email as string,
                 role: (p.role as Role) ?? ("inventory_manager" as Role),
                 invited_at: (p.invited_at as string) ?? null,
@@ -136,6 +140,15 @@ export default function Settings({
     setRefreshKey((k) => k + 1);
   }
 
+  async function performCancelInvite(id: string) {
+    const { error } = await supabase.from("invitations").delete().eq("id", id);
+    if (error) {
+      console.error("Cancel invitation failed:", error.message);
+      return;
+    }
+    setRefreshKey((k) => k + 1);
+  }
+
   return (
     <div className="space-y-6">
       {section === "users" && (
@@ -150,13 +163,14 @@ export default function Settings({
                 Invite user
               </button>
             </div>
-            <div className="overflow-x-auto">
+            {/* Desktop/tablet table */}
+            <div className="hidden sm:block overflow-x-auto">
               <table className="min-w-full text-sm">
                 <thead className="text-xs text-gray-500">
                   <tr>
                     <th className="text-left px-4 py-2 font-medium">User</th>
                     <th className="text-left px-4 py-2 font-medium">Email</th>
-                    <th className="px-4 py-2 font-medium">Role</th>
+                    <th className="text-left px-4 py-2 font-medium">Role</th>
                     <th className="px-4 py-2"></th>
                   </tr>
                 </thead>
@@ -200,6 +214,39 @@ export default function Settings({
                 </tbody>
               </table>
             </div>
+
+            {/* Mobile list */}
+            <div className="sm:hidden space-y-3">
+              {usersLoading && (
+                <div className="text-sm text-gray-600">Loading users…</div>
+              )}
+              {!usersLoading && users.length === 0 && (
+                <div className="text-sm text-gray-600">No users found.</div>
+              )}
+              {!usersLoading &&
+                users.map((u) => (
+                  <div
+                    key={u.email}
+                    className="rounded-xl border border-black/10 p-4"
+                  >
+                    <div className="font-medium text-[var(--oe-black)]">
+                      {u.name}
+                    </div>
+                    <div className="text-sm text-gray-700">{u.email}</div>
+                    <div className="mt-2 text-sm text-gray-800">
+                      Role: {formatRoleLabel(u.role)}
+                    </div>
+                    <div className="mt-3 flex justify-end">
+                      <button
+                        className="rounded bg-black/5 px-3 py-1 text-xs text-gray-700"
+                        disabled={u.isCurrentUser}
+                      >
+                        Update
+                      </button>
+                    </div>
+                  </div>
+                ))}
+            </div>
           </div>
 
           <div className="rounded-2xl bg-white p-6">
@@ -209,35 +256,73 @@ export default function Settings({
             {pendingInvites.length === 0 ? (
               <p className="text-sm text-gray-600">No pending invitations.</p>
             ) : (
-              <div className="overflow-x-auto">
-                <table className="min-w-full text-sm">
-                  <thead className="text-xs text-gray-500">
-                    <tr>
-                      <th className="text-left px-4 py-2 font-medium">Email</th>
-                      <th className="px-4 py-2 font-medium">Role</th>
-                      <th className="px-4 py-2"></th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {pendingInvites.map((p) => (
-                      <tr
-                        key={`pending-${p.email}-${p.invited_at ?? ""}`}
-                        className="hover:bg-black/5"
-                      >
-                        <td className="px-4 py-3 text-gray-700 whitespace-nowrap">
-                          {p.email}
-                        </td>
-                        <td className="px-4 py-3 text-gray-700 whitespace-nowrap">
-                          {formatRoleLabel(p.role)}
-                        </td>
-                        <td className="px-4 py-3 text-right">
-                          <span className="text-xs text-gray-500">Pending</span>
-                        </td>
+              <>
+                {/* Desktop/tablet table */}
+                <div className="hidden sm:block overflow-x-auto">
+                  <table className="min-w-full text-sm">
+                    <thead className="text-xs text-gray-500">
+                      <tr>
+                        <th className="text-left px-4 py-2 font-medium">
+                          Email
+                        </th>
+                        <th className="text-left px-4 py-2 font-medium">
+                          Role
+                        </th>
+                        <th className="text-right px-4 py-2 font-medium"></th>
                       </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
+                    </thead>
+                    <tbody>
+                      {pendingInvites.map((p) => (
+                        <tr key={p.id} className="hover:bg-black/5">
+                          <td className="px-4 py-3 text-gray-700 whitespace-nowrap">
+                            {p.email}
+                          </td>
+                          <td className="px-4 py-3 text-gray-700 whitespace-nowrap">
+                            {formatRoleLabel(p.role)}
+                          </td>
+                          <td className="px-4 py-3 text-right">
+                            <button
+                              className="rounded bg-red-500 text-white px-3 py-1 text-xs hover:bg-red-600"
+                              onClick={() => {
+                                setInviteToCancel(p.id);
+                                setConfirmOpen(true);
+                              }}
+                            >
+                              Cancel Invitation
+                            </button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+
+                {/* Mobile list */}
+                <div className="sm:hidden space-y-3">
+                  {pendingInvites.map((p) => (
+                    <div
+                      key={p.id}
+                      className="rounded-xl border border-black/10 p-4"
+                    >
+                      <div className="text-sm text-gray-700">{p.email}</div>
+                      <div className="mt-1 text-sm text-gray-800">
+                        Role: {formatRoleLabel(p.role)}
+                      </div>
+                      <div className="mt-3 flex justify-end">
+                        <button
+                          className="rounded bg-red-500 text-white px-3 py-1 text-xs hover:bg-red-600"
+                          onClick={() => {
+                            setInviteToCancel(p.id);
+                            setConfirmOpen(true);
+                          }}
+                        >
+                          Cancel Invitation
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </>
             )}
           </div>
 
@@ -245,6 +330,25 @@ export default function Settings({
             isOpen={inviteOpen}
             onClose={() => setInviteOpen(false)}
             onInvite={({ email, role }) => handleInvite(email, role as Role)}
+          />
+
+          <ConfirmModal
+            isOpen={confirmOpen}
+            title="Cancel invitation?"
+            message="Are you sure you want to cancel this pending invitation? This action cannot be undone."
+            confirmLabel="Cancel Invitation"
+            cancelLabel="Keep"
+            onConfirm={async () => {
+              if (inviteToCancel) {
+                await performCancelInvite(inviteToCancel);
+              }
+              setConfirmOpen(false);
+              setInviteToCancel(null);
+            }}
+            onClose={() => {
+              setConfirmOpen(false);
+              setInviteToCancel(null);
+            }}
           />
         </>
       )}
