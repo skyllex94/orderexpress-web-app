@@ -495,79 +495,80 @@ export default function Dashboard() {
         </div>
       </main>
       {/* Left-side Business Drawer */}
-      {businessDrawerOpen && (
-        <>
-          <div
-            className="fixed inset-0 z-40 bg-black/40"
-            onClick={() => setBusinessDrawerOpen(false)}
-          />
-          <div
-            className={`fixed inset-y-0 left-0 z-50 w-full max-w-md bg-gradient-to-b from-[#0f1114] to-[#15181c] text-white border-r border-[color:var(--oe-border)] shadow-xl transform transition-transform duration-300 ${
-              businessDrawerOpen ? "translate-x-0" : "-translate-x-full"
-            }`}
-          >
-            <div className="flex items-center justify-between p-4 border-b border-[color:var(--oe-border)]">
-              <div className="min-w-0">
-                <div className="text-xs uppercase tracking-wide text-gray-400">
-                  Business
-                </div>
-                <div className="mt-1 font-semibold truncate">
-                  {businessName || "Your Business"}
-                </div>
-              </div>
-              <div className="flex items-center gap-2">
-                <button
-                  onClick={() => setModalOpen(true)}
-                  className="rounded-md p-2 hover:bg-white/10"
-                  aria-label="Add business"
-                >
-                  <svg
-                    className="h-5 w-5 text-white"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="2"
-                  >
-                    <path d="M12 5v14" />
-                    <path d="M5 12h14" />
-                  </svg>
-                </button>
-                <button
-                  onClick={() => setBusinessDrawerOpen(false)}
-                  className="rounded-md p-2 hover:bg-white/10"
-                  aria-label="Close"
-                >
-                  <svg
-                    className="h-5 w-5 text-white"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="2"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      d="M6 18L18 6M6 6l12 12"
-                    />
-                  </svg>
-                </button>
-              </div>
+      <div
+        className={`fixed inset-0 z-40 transition-opacity duration-300 ${
+          businessDrawerOpen
+            ? "opacity-100 pointer-events-auto"
+            : "opacity-0 pointer-events-none"
+        } bg-black/40`}
+        onClick={() => setBusinessDrawerOpen(false)}
+      />
+      <div
+        className={`fixed inset-y-0 left-0 z-50 w-72 bg-gradient-to-b from-[#0f1114] to-[#15181c] text-white border-r border-[color:var(--oe-border)] shadow-xl transform transition-transform duration-500 ease-in-out ${
+          businessDrawerOpen ? "translate-x-0" : "-translate-x-full"
+        }`}
+        aria-hidden={!businessDrawerOpen}
+      >
+        <div className="flex items-center justify-between p-4 border-b border-[color:var(--oe-border)]">
+          <div className="min-w-0">
+            <div className="text-xs uppercase tracking-wide text-gray-400">
+              Business
             </div>
-            <div className="p-4">
-              <div className="text-sm text-gray-300">Businesses</div>
-              <div className="mt-3 space-y-2">
-                <div className="rounded-md border border-[color:var(--oe-border)] p-3">
-                  <div className="font-medium truncate">
-                    {businessName || "Your Business"}
-                  </div>
-                  <div className="text-xs text-gray-400 mt-1">Current</div>
-                </div>
-                {/* Additional businesses will appear here */}
-              </div>
+            <div className="mt-1 font-semibold truncate">
+              {businessName || "Your Business"}
             </div>
           </div>
-        </>
-      )}
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setModalOpen(true)}
+              className="rounded-md p-2 hover:bg-white/10"
+              aria-label="Add business"
+            >
+              <svg
+                className="h-5 w-5 text-white"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+              >
+                <path d="M12 5v14" />
+                <path d="M5 12h14" />
+              </svg>
+            </button>
+            <button
+              onClick={() => setBusinessDrawerOpen(false)}
+              className="rounded-md p-2 hover:bg-white/10"
+              aria-label="Close"
+            >
+              <svg
+                className="h-5 w-5 text-white"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  d="M6 18L18 6M6 6l12 12"
+                />
+              </svg>
+            </button>
+          </div>
+        </div>
+        <div className="p-4">
+          <div className="text-sm text-gray-300">Businesses</div>
+          <div className="mt-3 space-y-2">
+            <div className="rounded-md border border-[color:var(--oe-border)] p-3">
+              <div className="font-medium truncate">
+                {businessName || "Your Business"}
+              </div>
+              <div className="text-xs text-gray-400 mt-1">Current</div>
+            </div>
+            {/* Additional businesses will appear here */}
+          </div>
+        </div>
+      </div>
     </div>
   );
 }
