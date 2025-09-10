@@ -77,17 +77,31 @@ export default function InviteUserModal({
             <label className="block text-sm font-medium text-gray-700">
               Role
             </label>
-            <div className="mt-2 grid grid-cols-2 gap-3">
-              {[
-                "admin",
-                "inventory_manager",
-                "ordering_manager",
-                "sales_manager",
-              ].map((r) => (
+            <div className="mt-2 space-y-2">
+              {(
+                [
+                  {
+                    key: "admin",
+                    desc: "Full access across this business, including user management.",
+                  },
+                  {
+                    key: "inventory_manager",
+                    desc: "Manage products, stock, and inventory operations.",
+                  },
+                  {
+                    key: "ordering_manager",
+                    desc: "Place and manage orders; no inventory editing.",
+                  },
+                  {
+                    key: "sales_manager",
+                    desc: "View sales and analytics; read-only for most operations.",
+                  },
+                ] as { key: Role; desc: string }[]
+              ).map((opt) => (
                 <label
-                  key={r}
-                  className={`flex items-center gap-2 rounded-md border p-3 cursor-pointer ${
-                    role === r
+                  key={opt.key}
+                  className={`flex items-start gap-3 rounded-md border p-3 cursor-pointer ${
+                    role === opt.key
                       ? "border-[var(--oe-green)] bg-[var(--oe-green)]/10"
                       : "border-black/10 hover:bg-black/5"
                   }`}
@@ -95,13 +109,16 @@ export default function InviteUserModal({
                   <input
                     type="radio"
                     name="role"
-                    className="accent-[var(--oe-green)]"
-                    checked={role === (r as Role)}
-                    onChange={() => setRole(r as Role)}
+                    className="mt-0.5 accent-[var(--oe-green)]"
+                    checked={role === opt.key}
+                    onChange={() => setRole(opt.key)}
                   />
-                  <span className="capitalize">
-                    {(r as string).replace("_", " ")}
-                  </span>
+                  <div>
+                    <div className="text-sm font-medium capitalize text-[var(--oe-black)]">
+                      {opt.key.replace("_", " ")}
+                    </div>
+                    <div className="text-xs text-gray-600">{opt.desc}</div>
+                  </div>
                 </label>
               ))}
             </div>
@@ -124,7 +141,7 @@ export default function InviteUserModal({
             <button
               type="submit"
               disabled={submitting}
-              className="rounded-md px-4 py-2 text-sm bg-[var(--oe-green)] text-black font-medium hover:opacity-90 disabled:opacity-60"
+              className="rounded-md px-4 py-2 text-sm bg-[var(--oe-green)] text-black  hover:opacity-90 disabled:opacity-60"
             >
               {submitting ? "Sending..." : "Send invite"}
             </button>

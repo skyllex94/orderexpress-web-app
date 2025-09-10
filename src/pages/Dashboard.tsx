@@ -60,6 +60,7 @@ export default function Dashboard() {
     | "ordering_manager"
     | "sales_manager";
   const [currentRole, setCurrentRole] = useState<Role>("admin");
+  const [navDrawerOpen, setNavDrawerOpen] = useState(false);
 
   useEffect(() => {
     let mounted = true;
@@ -318,7 +319,7 @@ export default function Dashboard() {
   return (
     <div className="flex min-h-screen">
       <aside
-        className={`transition-all duration-300 ${
+        className={`hidden md:block transition-all duration-300 ${
           collapsed ? "w-16" : "w-52"
         } bg-gradient-to-b from-[#0f1114] to-[#15181c] text-white border-r border-[color:var(--oe-border)] sticky top-0 self-start h-screen`}
       >
@@ -543,6 +544,25 @@ export default function Dashboard() {
           </button>
         </div>
       </aside>
+
+      {/* Mobile slide handle to open nav drawer */}
+      {!navDrawerOpen && (
+        <button
+          onClick={() => setNavDrawerOpen(true)}
+          aria-label="Open menu"
+          className="md:hidden fixed left-0 top-3 z-40 rounded-r-md bg-[var(--oe-black)]/80 text-white px-2 py-3 shadow"
+        >
+          <svg
+            className="h-5 w-5"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+          >
+            <path d="M4 6h16M4 12h16M4 18h16" />
+          </svg>
+        </button>
+      )}
       <main className="flex-1 p-6">
         <div className="mx-auto max-w-[120rem]">
           {active === "overview" && (
@@ -668,6 +688,224 @@ export default function Dashboard() {
           />
         </div>
       </main>
+
+      {/* Mobile Nav Drawer */}
+      <div
+        className={`fixed inset-0 z-40 transition-opacity duration-300 ${
+          navDrawerOpen
+            ? "opacity-100 pointer-events-auto"
+            : "opacity-0 pointer-events-none"
+        } bg-black/40 md:hidden`}
+        onClick={() => setNavDrawerOpen(false)}
+      />
+      <div
+        className={`fixed inset-y-0 left-0 z-50 w-72 bg-gradient-to-b from-[#0f1114] to-[#15181c] text-white border-r border-[color:var(--oe-border)] shadow-xl transform transition-transform duration-500 ease-in-out ${
+          navDrawerOpen ? "translate-x-0" : "-translate-x-full"
+        } md:hidden`}
+        aria-hidden={!navDrawerOpen}
+      >
+        <div className="flex items-center justify-between p-4 border-b border-[color:var(--oe-border)]">
+          <div className="flex items-center gap-2 min-w-0">
+            <div className="h-7 w-7 rounded-md bg-[var(--oe-green)]" />
+            <div className="font-semibold truncate">OrderExpress</div>
+          </div>
+          <button
+            onClick={() => setNavDrawerOpen(false)}
+            className="rounded-md p-2 hover:bg-white/10"
+            aria-label="Close menu"
+          >
+            <svg
+              className="h-5 w-5 text-white"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                d="M6 18L18 6M6 6l12 12"
+              />
+            </svg>
+          </button>
+        </div>
+        <div className="px-4 py-4 border-b border-[color:var(--oe-border)]">
+          <button
+            onClick={() => {
+              setBusinessDrawerOpen(true);
+              setNavDrawerOpen(false);
+            }}
+            className="w-full text-left rounded-md px-2 py-2 hover:bg-white/5"
+          >
+            <div className="text-xs uppercase tracking-wide text-gray-400">
+              Business
+            </div>
+            <div className="mt-1 font-medium truncate">
+              {businessName || "Your Business"}
+            </div>
+          </button>
+        </div>
+        <nav className="px-2 py-3 space-y-1">
+          {items
+            .filter((it) => {
+              if (currentRole === "admin") return true;
+              if (currentRole === "inventory_manager")
+                return it.key === "inventory";
+              if (currentRole === "ordering_manager")
+                return it.key === "ordering";
+              if (currentRole === "sales_manager")
+                return it.key === "analytics";
+              return true;
+            })
+            .map((it) => (
+              <button
+                key={it.key}
+                onClick={() => {
+                  setActive(it.key);
+                  setSettingsOpen(false);
+                  setNavDrawerOpen(false);
+                }}
+                className={`w-full text-left flex items-center gap-3 rounded-md px-3 py-2 transition ${
+                  active === it.key ? "bg-white/10" : "hover:bg-white/5"
+                }`}
+              >
+                <Icon k={it.key} active={active === it.key} />
+                <span>{it.label}</span>
+              </button>
+            ))}
+
+          {/* Settings dropdown (mobile) */}
+          <div>
+            <button
+              onClick={() => {
+                setActive("settings");
+                setSettingsOpen(!settingsOpen);
+              }}
+              className={`w-full text-left flex items-center justify-between rounded-md px-3 py-2 transition ${
+                active === "settings" ? "bg-white/10" : "hover:bg-white/5"
+              }`}
+            >
+              <div className="flex items-center gap-3">
+                <Icon k="settings" active={active === "settings"} />
+                <span>Settings</span>
+              </div>
+              <svg
+                className={`h-4 w-4 text-gray-400 transition-transform ${
+                  settingsOpen ? "rotate-180" : ""
+                }`}
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+              >
+                <path d="M6 9l6 6 6-6" />
+              </svg>
+            </button>
+            {settingsOpen && (
+              <div className="mt-1 space-y-1">
+                <button
+                  onClick={() => {
+                    setActive("settings");
+                    setSettingsSection("plan");
+                    setNavDrawerOpen(false);
+                  }}
+                  className={`w-full text-left flex items-center gap-3 rounded-md px-3 py-2 text-sm ${
+                    settingsSection === "plan"
+                      ? "bg-white/10"
+                      : "hover:bg-white/5"
+                  }`}
+                >
+                  <svg
+                    className="h-4 w-4 text-gray-400"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                  >
+                    <rect x="3" y="5" width="18" height="14" rx="2" ry="2" />
+                    <line x1="3" y1="10" x2="21" y2="10" />
+                  </svg>
+                  <span>Plan & Billing</span>
+                </button>
+                <button
+                  onClick={() => {
+                    setActive("settings");
+                    setSettingsSection("users");
+                    setNavDrawerOpen(false);
+                  }}
+                  className={`w-full text-left flex items-center gap-3 rounded-md px-3 py-2 text-sm ${
+                    settingsSection === "users"
+                      ? "bg-white/10"
+                      : "hover:bg-white/5"
+                  }`}
+                >
+                  <svg
+                    className="h-4 w-4 text-gray-400"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                  >
+                    <path d="M16 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
+                    <circle cx="9" cy="7" r="4" />
+                    <path d="M22 21v-2a4 4 0 0 0-3-3.87" />
+                    <path d="M16 3.13a4 4 0 0 1 0 7.75" />
+                  </svg>
+                  <span>Users</span>
+                </button>
+                <button
+                  onClick={() => {
+                    setActive("settings");
+                    setSettingsSection("account");
+                    setNavDrawerOpen(false);
+                  }}
+                  className={`w-full text-left flex items-center gap-3 rounded-md px-3 py-2 text-sm ${
+                    settingsSection === "account"
+                      ? "bg-white/10"
+                      : "hover:bg-white/5"
+                  }`}
+                >
+                  <svg
+                    className="h-4 w-4 text-gray-400"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                  >
+                    <circle cx="12" cy="12" r="3" />
+                    <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09a1.65 1.65 0 0 0-1-1.51 1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09a1.65 1.65 0 0 0 1.51-1 1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9c0 .66.39 1.26 1 1.51H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" />
+                  </svg>
+                  <span>Account Settings</span>
+                </button>
+              </div>
+            )}
+          </div>
+
+          {/* Sign out */}
+          <div className="px-2 pb-2 mt-2">
+            <button
+              onClick={async () => {
+                await supabase.auth.signOut();
+                navigate("/");
+              }}
+              className="w-full text-left flex items-center gap-3 rounded-md px-3 py-2 hover:bg-white/5 text-white/90"
+            >
+              <svg
+                className="h-4 w-4 text-gray-400"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+              >
+                <path d="M10 17l5-5-5-5" />
+                <path d="M15 12H3" />
+                <path d="M21 21V3" />
+              </svg>
+              <span>Sign out</span>
+            </button>
+          </div>
+        </nav>
+      </div>
       {/* Left-side Business Drawer */}
       <div
         className={`fixed inset-0 z-40 transition-opacity duration-300 ${

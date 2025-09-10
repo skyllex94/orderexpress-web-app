@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { AdjustmentsHorizontalIcon } from "@heroicons/react/24/outline";
+import { PlusIcon } from "@heroicons/react/24/solid";
 import { supabase } from "../../../services/supabase";
 import InviteUserModal from "../../../components/InviteUserModal";
 import ConfirmModal from "../../../components/ConfirmModal";
@@ -189,9 +190,10 @@ export default function Users({ businessId }: { businessId: string }) {
           <h2 className="font-medium">Users</h2>
           <button
             onClick={() => setInviteOpen(true)}
-            className="rounded-md bg-[var(--oe-green)] px-3 py-2 text-black text-sm hover:opacity-90"
+            className="inline-flex items-center gap-2 rounded-md border border-[var(--oe-green)] px-3 py-2 text-sm text-[var(--oe-gray)] font-semibold hover:bg-[color:var(--oe-green)]/30 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--oe-green)]"
           >
-            Invite user
+            <PlusIcon className="h-4 w-4 text-[var(--oe-black)]" />
+            <span>Invite user</span>
           </button>
         </div>
         {/* Desktop/tablet table */}
