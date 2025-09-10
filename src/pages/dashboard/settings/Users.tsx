@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { AdjustmentsHorizontalIcon } from "@heroicons/react/24/outline";
 import { supabase } from "../../../services/supabase";
 import InviteUserModal from "../../../components/InviteUserModal";
 import ConfirmModal from "../../../components/ConfirmModal";
@@ -13,7 +14,13 @@ export default function Users({ businessId }: { businessId: string }) {
   const [inviteOpen, setInviteOpen] = useState(false);
   const [usersLoading, setUsersLoading] = useState(false);
   const [users, setUsers] = useState<
-    { name: string; email: string; isCurrentUser: boolean; role: Role }[]
+    {
+      userId: string;
+      name: string;
+      email: string;
+      isCurrentUser: boolean;
+      role: Role;
+    }[]
   >([]);
   const [pendingInvites, setPendingInvites] = useState<
     { id: string; email: string; role: Role; invited_at?: string | null }[]
@@ -21,7 +28,25 @@ export default function Users({ businessId }: { businessId: string }) {
   const [refreshKey, setRefreshKey] = useState(0);
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [inviteToCancel, setInviteToCancel] = useState<string | null>(null);
-  // Inline action buttons; no dropdown state needed
+  const [deleteUserOpen, setDeleteUserOpen] = useState(false);
+  const [deletingUser, setDeletingUser] = useState(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
+  const [userToDelete, setUserToDelete] = useState<{
+    userId: string;
+    email: string;
+    name: string;
+  } | null>(null);
+  // Change role modal state
+  const [changeRoleOpen, setChangeRoleOpen] = useState(false);
+  const [userToChangeRole, setUserToChangeRole] = useState<{
+    userId: string;
+    email: string;
+    name: string;
+    role: Role;
+  } | null>(null);
+  const [roleSelection, setRoleSelection] = useState<Role | null>(null);
+  const [changeRoleSaving, setChangeRoleSaving] = useState(false);
+  const [changeRoleError, setChangeRoleError] = useState<string | null>(null);
 
   function formatRoleLabel(role: Role): string {
     const s = role.replace("_", " ");
@@ -39,6 +64,7 @@ export default function Users({ businessId }: { businessId: string }) {
         if (!current) return;
 
         let list: {
+          userId: string;
           name: string;
           email: string;
           isCurrentUser: boolean;
@@ -65,6 +91,7 @@ export default function Users({ businessId }: { businessId: string }) {
                   m.email ||
                   "User";
                 return {
+                  userId: m.user_id,
                   name,
                   email: m.email || "",
                   isCurrentUser: isSelf,
@@ -143,6 +170,18 @@ export default function Users({ businessId }: { businessId: string }) {
     setRefreshKey((k) => k + 1);
   }
 
+  async function performDeleteUser(userId: string) {
+    const { error } = await supabase.rpc("remove_user_from_business", {
+      p_business_id: businessId,
+      p_user_id: userId,
+    });
+    if (error) {
+      console.error("Delete user failed:", error.message);
+      throw error;
+    }
+    setRefreshKey((k) => k + 1);
+  }
+
   return (
     <div className="space-y-6">
       <div className="rounded-2xl bg-white p-6">
@@ -209,27 +248,28 @@ export default function Users({ businessId }: { businessId: string }) {
                                 className="rounded p-2 hover:bg-black/10"
                                 aria-label="Change role"
                                 onClick={() => {
-                                  // TODO: open change role flow
+                                  setUserToChangeRole({
+                                    userId: u.userId,
+                                    email: u.email,
+                                    name: u.name,
+                                    role: u.role,
+                                  });
+                                  setRoleSelection(u.role);
+                                  setChangeRoleOpen(true);
                                 }}
                               >
-                                <svg
-                                  className="h-5 w-5 text-gray-700"
-                                  viewBox="0 0 24 24"
-                                  fill="none"
-                                  stroke="currentColor"
-                                  strokeWidth="2"
-                                >
-                                  <path d="M20 7h-7" />
-                                  <path d="M13 10l-3-3 3-3" />
-                                  <circle cx="7" cy="12" r="3" />
-                                  <path d="M7 15v4" />
-                                </svg>
+                                <AdjustmentsHorizontalIcon className="h-5 w-5 text-gray-700" />
                               </button>
                               <button
                                 className="rounded p-2 hover:bg-red-50"
                                 aria-label="Delete user"
                                 onClick={() => {
-                                  // TODO: open delete confirmation
+                                  setUserToDelete({
+                                    userId: u.userId,
+                                    email: u.email,
+                                    name: u.name,
+                                  });
+                                  setDeleteUserOpen(true);
                                 }}
                               >
                                 <svg
@@ -277,59 +317,63 @@ export default function Users({ businessId }: { businessId: string }) {
                   key={u.email}
                   className="rounded-xl border border-black/10 p-4"
                 >
-                  <div className="flex items-start justify-between">
-                    <div>
-                      <div className="font-medium text-[var(--oe-black)]">
-                        {u.name}
-                      </div>
-                      <div className="text-sm text-gray-700">{u.email}</div>
+                  <div>
+                    <div className="font-medium text-[var(--oe-black)]">
+                      {u.name}
                     </div>
-                    {showMenu && (
-                      <div className="inline-flex items-center gap-2">
-                        <button
-                          className="rounded p-2 hover:bg-black/10"
-                          aria-label="Change role"
-                          onClick={() => {
-                            // TODO: open change role flow
-                          }}
-                        >
-                          <svg
-                            className="h-5 w-5 text-gray-700"
-                            viewBox="0 0 24 24"
-                            fill="none"
-                            stroke="currentColor"
-                            strokeWidth="2"
-                          >
-                            <path d="M3 12h3l3 8 4-16 3 8h5" />
-                          </svg>
-                        </button>
-                        <button
-                          className="rounded p-2 hover:bg-red-50"
-                          aria-label="Delete user"
-                          onClick={() => {
-                            // TODO: open delete confirmation
-                          }}
-                        >
-                          <svg
-                            className="h-5 w-5 text-red-600"
-                            viewBox="0 0 24 24"
-                            fill="none"
-                            stroke="currentColor"
-                            strokeWidth="2"
-                          >
-                            <polyline points="3 6 5 6 21 6" />
-                            <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" />
-                            <path d="M10 11v6" />
-                            <path d="M14 11v6" />
-                            <path d="M9 6V4a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v2" />
-                          </svg>
-                        </button>
-                      </div>
-                    )}
+                    <div className="text-sm text-gray-700 break-words">
+                      {u.email}
+                    </div>
                   </div>
                   <div className="mt-2 text-sm text-gray-800">
                     Role: {formatRoleLabel(u.role)}
                   </div>
+                  {showMenu && (
+                    <div className="mt-3 flex gap-3">
+                      <button
+                        className="rounded p-2 hover:bg-black/10"
+                        aria-label="Change role"
+                        onClick={() => {
+                          setUserToChangeRole({
+                            userId: u.userId,
+                            email: u.email,
+                            name: u.name,
+                            role: u.role,
+                          });
+                          setRoleSelection(u.role);
+                          setChangeRoleOpen(true);
+                        }}
+                      >
+                        <AdjustmentsHorizontalIcon className="h-5 w-5 text-gray-700" />
+                      </button>
+                      <button
+                        className="rounded p-2 hover:bg-red-50"
+                        aria-label="Delete user"
+                        onClick={() => {
+                          setUserToDelete({
+                            userId: u.userId,
+                            email: u.email,
+                            name: u.name,
+                          });
+                          setDeleteUserOpen(true);
+                        }}
+                      >
+                        <svg
+                          className="h-5 w-5 text-red-600"
+                          viewBox="0 0 24 24"
+                          fill="none"
+                          stroke="currentColor"
+                          strokeWidth="2"
+                        >
+                          <polyline points="3 6 5 6 21 6" />
+                          <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" />
+                          <path d="M10 11v6" />
+                          <path d="M14 11v6" />
+                          <path d="M9 6V4a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v2" />
+                        </svg>
+                      </button>
+                    </div>
+                  )}
                 </div>
               );
             })}
@@ -431,6 +475,171 @@ export default function Users({ businessId }: { businessId: string }) {
         onClose={() => {
           setConfirmOpen(false);
           setInviteToCancel(null);
+        }}
+      />
+
+      {/* Change Role Modal - UI only */}
+      <ConfirmModal
+        isOpen={changeRoleOpen}
+        title="Change user role"
+        message={
+          <div>
+            <div className="text-sm text-gray-700">
+              <div>
+                User:{" "}
+                <span className="font-medium text-[var(--oe-black)]">
+                  {userToChangeRole?.name}
+                </span>
+              </div>
+              <div className="mt-1">
+                Current role:{" "}
+                <span className="capitalize">
+                  {userToChangeRole?.role?.replace("_", " ")}
+                </span>
+              </div>
+              <div className="mt-2 text-xs text-gray-500">
+                Choose a new role for this user. This only affects access within
+                this business.
+              </div>
+            </div>
+
+            <div className="mt-4 space-y-2">
+              {(
+                [
+                  {
+                    key: "admin",
+                    desc: "Full access across this business, including user management.",
+                  },
+                  {
+                    key: "inventory_manager",
+                    desc: "Manage products, stock, and inventory operations.",
+                  },
+                  {
+                    key: "ordering_manager",
+                    desc: "Place and manage orders; no inventory editing.",
+                  },
+                  {
+                    key: "sales_manager",
+                    desc: "View sales and analytics; read-only for most operations.",
+                  },
+                ] as { key: Role; desc: string }[]
+              ).map((opt) => (
+                <label
+                  key={opt.key}
+                  className="flex items-start gap-3 rounded-md border border-black/10 p-3 hover:bg-black/5 cursor-pointer"
+                >
+                  <input
+                    type="radio"
+                    name="role"
+                    className="mt-0.5"
+                    checked={roleSelection === opt.key}
+                    onChange={() => setRoleSelection(opt.key)}
+                  />
+                  <div>
+                    <div className="text-sm font-medium capitalize text-[var(--oe-black)]">
+                      {opt.key.replace("_", " ")}
+                    </div>
+                    <div className="text-xs text-gray-600">{opt.desc}</div>
+                  </div>
+                </label>
+              ))}
+            </div>
+
+            {changeRoleSaving && (
+              <div className="mt-3 flex items-center gap-2 text-sm text-gray-700">
+                <div className="h-4 w-4 rounded-full border-2 border-black/10 border-t-[var(--oe-green)] animate-spin" />
+                <span>Saving…</span>
+              </div>
+            )}
+            {changeRoleError && (
+              <div className="mt-3 text-sm text-red-600">{changeRoleError}</div>
+            )}
+          </div>
+        }
+        confirmLabel="Save"
+        cancelLabel="Cancel"
+        onConfirm={async () => {
+          if (
+            !userToChangeRole ||
+            !roleSelection ||
+            roleSelection === userToChangeRole.role
+          ) {
+            setChangeRoleOpen(false);
+            setUserToChangeRole(null);
+            setRoleSelection(null);
+            return;
+          }
+          setChangeRoleError(null);
+          setChangeRoleSaving(true);
+          try {
+            const { error } = await supabase.rpc("set_user_role_in_business", {
+              p_business_id: businessId,
+              p_user_id: userToChangeRole.userId,
+              p_role: roleSelection,
+            });
+            if (error) throw error;
+            setChangeRoleOpen(false);
+            setUserToChangeRole(null);
+            setRoleSelection(null);
+            setRefreshKey((k) => k + 1);
+          } catch (err) {
+            const msg =
+              err instanceof Error ? err.message : "Could not change role.";
+            setChangeRoleError(msg);
+          } finally {
+            setChangeRoleSaving(false);
+          }
+        }}
+        onClose={() => {
+          setChangeRoleOpen(false);
+          setUserToChangeRole(null);
+          setRoleSelection(null);
+        }}
+      />
+
+      <ConfirmModal
+        isOpen={deleteUserOpen}
+        title="Remove user from business?"
+        message={
+          <div>
+            <div>
+              Are you sure you want to remove {userToDelete?.name} from this
+              business?
+            </div>
+            {deletingUser && (
+              <div className="mt-3 flex items-center gap-2 text-sm text-gray-700">
+                <div className="h-4 w-4 rounded-full border-2 border-black/10 border-t-[var(--oe-green)] animate-spin" />
+                <span>Removing…</span>
+              </div>
+            )}
+            {deleteError && (
+              <div className="mt-3 text-sm text-red-600">{deleteError}</div>
+            )}
+          </div>
+        }
+        confirmLabel="Remove"
+        cancelLabel="Cancel"
+        onConfirm={async () => {
+          if (!userToDelete) return;
+          setDeleteError(null);
+          setDeletingUser(true);
+          try {
+            await performDeleteUser(userToDelete.userId);
+            setDeleteUserOpen(false);
+            setUserToDelete(null);
+          } catch (err) {
+            const msg =
+              err instanceof Error ? err.message : "Could not remove user.";
+            setDeleteError(msg);
+          } finally {
+            setDeletingUser(false);
+          }
+        }}
+        onClose={() => {
+          setDeleteUserOpen(false);
+          setUserToDelete(null);
+          setDeletingUser(false);
+          setDeleteError(null);
         }}
       />
 
