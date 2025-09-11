@@ -9,6 +9,9 @@ import Inventory from "./dashboard/Inventory";
 import Ordering from "./dashboard/Ordering";
 import Analytics from "./dashboard/Analytics";
 import SettingsPanel from "./dashboard/Settings";
+import ProductsFood from "./dashboard/products/Food";
+import ProductsDrinks from "./dashboard/products/Drinks";
+import ProductsCategories from "./dashboard/products/Categories";
 import DashboardNavbar from "../components/DashboardNavbar";
 
 type SidebarItem = {
@@ -18,6 +21,7 @@ type SidebarItem = {
 
 const items: SidebarItem[] = [
   { key: "overview", label: "Overview" },
+  { key: "products", label: "Products" },
   { key: "inventory", label: "Inventory" },
   { key: "ordering", label: "Ordering" },
   { key: "analytics", label: "Analytics" },
@@ -62,10 +66,16 @@ export default function Dashboard() {
     | "sales_manager";
   const [currentRole, setCurrentRole] = useState<Role>("admin");
   const [navDrawerOpen, setNavDrawerOpen] = useState(false);
+  const [productsOpen, setProductsOpen] = useState(true);
+  const [productsSection, setProductsSection] = useState<
+    "food" | "drink" | "categories" | null
+  >("food");
 
   const activeLabel: string =
     active === "settings"
       ? "Settings"
+      : active === "products"
+      ? "Products"
       : items.find((it) => it.key === active)?.label || "Overview";
   const currentSettingsLabel: string | null =
     settingsSection === "plan"
@@ -74,6 +84,14 @@ export default function Dashboard() {
       ? "Users"
       : settingsSection === "account"
       ? "Account Settings"
+      : null;
+  const currentProductsLabel: string | null =
+    productsSection === "food"
+      ? "Food Products"
+      : productsSection === "drink"
+      ? "Drink Products"
+      : productsSection === "categories"
+      ? "Categories"
       : null;
 
   useEffect(() => {
@@ -263,9 +281,9 @@ export default function Dashboard() {
   // Enforce allowed menu for role
   useEffect(() => {
     const allowed: Record<Role, string[]> = {
-      admin: ["overview", "inventory", "ordering", "analytics"],
-      inventory_manager: ["inventory"],
-      ordering_manager: ["ordering"],
+      admin: ["overview", "products", "inventory", "ordering", "analytics"],
+      inventory_manager: ["products", "inventory"],
+      ordering_manager: ["products", "ordering"],
       sales_manager: ["analytics"],
     };
     if (active === "settings") return;
@@ -296,6 +314,12 @@ export default function Dashboard() {
       strokeWidth="2"
     >
       {k === "overview" && <path d="M3 12h18M3 6h18M3 18h18" />}
+      {k === "products" && (
+        <>
+          <path d="M4 7l8-4 8 4-8 4-8-4z" />
+          <path d="M4 7v10l8 4 8-4V7" />
+        </>
+      )}
       {k === "inventory" && (
         <>
           <path d="M4 4h16v6H4z" />
@@ -367,27 +391,131 @@ export default function Dashboard() {
             .filter((it) => {
               if (currentRole === "admin") return true;
               if (currentRole === "inventory_manager")
-                return it.key === "inventory";
+                return ["products", "inventory"].includes(it.key);
               if (currentRole === "ordering_manager")
-                return it.key === "ordering";
+                return ["products", "ordering"].includes(it.key);
               if (currentRole === "sales_manager")
                 return it.key === "analytics";
               return true;
             })
             .map((it) => (
-              <button
-                key={it.key}
-                onClick={() => {
-                  setActive(it.key);
-                  setSettingsOpen(false);
-                }}
-                className={`w-full text-left flex items-center gap-3 rounded-md px-3 py-2 transition ${
-                  active === it.key ? "bg-white/10" : "hover:bg-white/5"
-                }`}
-              >
-                <Icon k={it.key} active={active === it.key} />
-                {!collapsed && <span>{it.label}</span>}
-              </button>
+              <div key={it.key}>
+                <button
+                  onClick={() => {
+                    if (it.key === "products") {
+                      setActive("products");
+                      setProductsOpen(!productsOpen);
+                      return;
+                    }
+                    setActive(it.key);
+                    setSettingsOpen(false);
+                  }}
+                  className={`w-full text-left flex items-center justify-between rounded-md px-3 py-2 transition ${
+                    active === it.key ? "bg-white/10" : "hover:bg-white/5"
+                  }`}
+                >
+                  <div className="flex items-center gap-3">
+                    <Icon k={it.key} active={active === it.key} />
+                    {!collapsed && <span>{it.label}</span>}
+                  </div>
+                  {!collapsed && it.key === "products" && (
+                    <svg
+                      className={`h-4 w-4 text-gray-400 transition-transform ${
+                        productsOpen ? "rotate-180" : ""
+                      }`}
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2"
+                    >
+                      <path d="M6 9l6 6 6-6" />
+                    </svg>
+                  )}
+                </button>
+                {it.key === "products" &&
+                  (
+                    ["admin", "inventory_manager", "ordering_manager"] as Role[]
+                  ).includes(currentRole) &&
+                  productsOpen && (
+                    <div className="mt-1 space-y-1">
+                      <button
+                        onClick={() => {
+                          setActive("products");
+                          setProductsSection("food");
+                        }}
+                        className={`w-full text-left flex items-center gap-3 rounded-md px-3 py-2 text-sm ${
+                          active === "products" && productsSection === "food"
+                            ? "bg-white/10"
+                            : "hover:bg-white/5"
+                        }`}
+                      >
+                        <svg
+                          className="h-4 w-4 text-gray-400"
+                          viewBox="0 0 24 24"
+                          fill="none"
+                          stroke="currentColor"
+                          strokeWidth="2"
+                        >
+                          <path d="M6 3v8" />
+                          <path d="M10 3v8" />
+                          <path d="M6 7h4" />
+                          <path d="M14 3v8a2 2 0 0 0 2 2h2V3" />
+                        </svg>
+                        <span>Food Products</span>
+                      </button>
+                      <button
+                        onClick={() => {
+                          setActive("products");
+                          setProductsSection("drink");
+                        }}
+                        className={`w-full text-left flex items-center gap-3 rounded-md px-3 py-2 text-sm ${
+                          active === "products" && productsSection === "drink"
+                            ? "bg-white/10"
+                            : "hover:bg-white/5"
+                        }`}
+                      >
+                        <svg
+                          className="h-4 w-4 text-gray-400"
+                          viewBox="0 0 24 24"
+                          fill="none"
+                          stroke="currentColor"
+                          strokeWidth="2"
+                        >
+                          <path d="M3 3h18" />
+                          <path d="M8 3l2 7a4 4 0 0 0 4 3h4" />
+                          <path d="M7 21h10" />
+                        </svg>
+                        <span>Drink Products</span>
+                      </button>
+                      <button
+                        onClick={() => {
+                          setActive("products");
+                          setProductsSection("categories");
+                        }}
+                        className={`w-full text-left flex items-center gap-3 rounded-md px-3 py-2 text-sm ${
+                          active === "products" &&
+                          productsSection === "categories"
+                            ? "bg-white/10"
+                            : "hover:bg-white/5"
+                        }`}
+                      >
+                        <svg
+                          className="h-4 w-4 text-gray-400"
+                          viewBox="0 0 24 24"
+                          fill="none"
+                          stroke="currentColor"
+                          strokeWidth="2"
+                        >
+                          <path d="M4 4h7v7H4z" />
+                          <path d="M13 4h7v7h-7z" />
+                          <path d="M4 13h7v7H4z" />
+                          <path d="M13 13h7v7h-7z" />
+                        </svg>
+                        <span>Categories</span>
+                      </button>
+                    </div>
+                  )}
+              </div>
             ))}
 
           {/* Settings dropdown */}
@@ -581,7 +709,13 @@ export default function Dashboard() {
         {/* Top sticky navbar showing current menu */}
         <DashboardNavbar
           title={activeLabel}
-          subtitle={active === "settings" ? currentSettingsLabel : null}
+          subtitle={
+            active === "settings"
+              ? currentSettingsLabel
+              : active === "products"
+              ? currentProductsLabel
+              : null
+          }
         />
         <div className="mx-auto max-w-[120rem]">
           {active === "overview" && (
@@ -600,6 +734,13 @@ export default function Dashboard() {
             </>
           )}
           {active === "inventory" && <Inventory />}
+          {active === "products" && (
+            <>
+              {productsSection === "food" && <ProductsFood />}
+              {productsSection === "drink" && <ProductsDrinks />}
+              {productsSection === "categories" && <ProductsCategories />}
+            </>
+          )}
           {active === "ordering" && <Ordering />}
           {active === "analytics" && <Analytics />}
           {active === "settings" && (
@@ -769,28 +910,135 @@ export default function Dashboard() {
             .filter((it) => {
               if (currentRole === "admin") return true;
               if (currentRole === "inventory_manager")
-                return it.key === "inventory";
+                return ["products", "inventory"].includes(it.key);
               if (currentRole === "ordering_manager")
-                return it.key === "ordering";
+                return ["products", "ordering"].includes(it.key);
               if (currentRole === "sales_manager")
                 return it.key === "analytics";
               return true;
             })
             .map((it) => (
-              <button
-                key={it.key}
-                onClick={() => {
-                  setActive(it.key);
-                  setSettingsOpen(false);
-                  setNavDrawerOpen(false);
-                }}
-                className={`w-full text-left flex items-center gap-3 rounded-md px-3 py-2 transition ${
-                  active === it.key ? "bg-white/10" : "hover:bg-white/5"
-                }`}
-              >
-                <Icon k={it.key} active={active === it.key} />
-                <span>{it.label}</span>
-              </button>
+              <div key={it.key}>
+                <button
+                  onClick={() => {
+                    if (it.key === "products") {
+                      setActive("products");
+                      setProductsOpen(!productsOpen);
+                      return;
+                    }
+                    setActive(it.key);
+                    setSettingsOpen(false);
+                    setNavDrawerOpen(false);
+                  }}
+                  className={`w-full text-left flex items-center justify-between rounded-md px-3 py-2 transition ${
+                    active === it.key ? "bg-white/10" : "hover:bg-white/5"
+                  }`}
+                >
+                  <div className="flex items-center gap-3">
+                    <Icon k={it.key} active={active === it.key} />
+                    <span>{it.label}</span>
+                  </div>
+                  {it.key === "products" && (
+                    <svg
+                      className={`h-4 w-4 text-gray-400 transition-transform ${
+                        productsOpen ? "rotate-180" : ""
+                      }`}
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2"
+                    >
+                      <path d="M6 9l6 6 6-6" />
+                    </svg>
+                  )}
+                </button>
+                {it.key === "products" &&
+                  (
+                    ["admin", "inventory_manager", "ordering_manager"] as Role[]
+                  ).includes(currentRole) &&
+                  productsOpen && (
+                    <div className="mt-1 space-y-1">
+                      <button
+                        onClick={() => {
+                          setActive("products");
+                          setProductsSection("food");
+                          setNavDrawerOpen(false);
+                        }}
+                        className={`w-full text-left flex items-center gap-3 rounded-md px-3 py-2 text-sm ${
+                          active === "products" && productsSection === "food"
+                            ? "bg-white/10"
+                            : "hover:bg-white/5"
+                        }`}
+                      >
+                        <svg
+                          className="h-4 w-4 text-gray-400"
+                          viewBox="0 0 24 24"
+                          fill="none"
+                          stroke="currentColor"
+                          strokeWidth="2"
+                        >
+                          <path d="M6 3v8" />
+                          <path d="M10 3v8" />
+                          <path d="M6 7h4" />
+                          <path d="M14 3v8a2 2 0 0 0 2 2h2V3" />
+                        </svg>
+                        <span>Food Products</span>
+                      </button>
+                      <button
+                        onClick={() => {
+                          setActive("products");
+                          setProductsSection("drink");
+                          setNavDrawerOpen(false);
+                        }}
+                        className={`w-full text-left flex items-center gap-3 rounded-md px-3 py-2 text-sm ${
+                          active === "products" && productsSection === "drink"
+                            ? "bg-white/10"
+                            : "hover:bg-white/5"
+                        }`}
+                      >
+                        <svg
+                          className="h-4 w-4 text-gray-400"
+                          viewBox="0 0 24 24"
+                          fill="none"
+                          stroke="currentColor"
+                          strokeWidth="2"
+                        >
+                          <path d="M3 3h18" />
+                          <path d="M8 3l2 7a4 4 0 0 0 4 3h4" />
+                          <path d="M7 21h10" />
+                        </svg>
+                        <span>Drink Products</span>
+                      </button>
+                      <button
+                        onClick={() => {
+                          setActive("products");
+                          setProductsSection("categories");
+                          setNavDrawerOpen(false);
+                        }}
+                        className={`w-full text-left flex items-center gap-3 rounded-md px-3 py-2 text-sm ${
+                          active === "products" &&
+                          productsSection === "categories"
+                            ? "bg-white/10"
+                            : "hover:bg-white/5"
+                        }`}
+                      >
+                        <svg
+                          className="h-4 w-4 text-gray-400"
+                          viewBox="0 0 24 24"
+                          fill="none"
+                          stroke="currentColor"
+                          strokeWidth="2"
+                        >
+                          <path d="M4 4h7v7H4z" />
+                          <path d="M13 4h7v7h-7z" />
+                          <path d="M4 13h7v7H4z" />
+                          <path d="M13 13h7v7h-7z" />
+                        </svg>
+                        <span>Categories</span>
+                      </button>
+                    </div>
+                  )}
+              </div>
             ))}
 
           {/* Settings dropdown (mobile) */}
