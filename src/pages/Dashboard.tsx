@@ -9,6 +9,7 @@ import Inventory from "./dashboard/Inventory";
 import Ordering from "./dashboard/Ordering";
 import Analytics from "./dashboard/Analytics";
 import SettingsPanel from "./dashboard/Settings";
+import DashboardNavbar from "../components/DashboardNavbar";
 
 type SidebarItem = {
   key: string;
@@ -61,6 +62,19 @@ export default function Dashboard() {
     | "sales_manager";
   const [currentRole, setCurrentRole] = useState<Role>("admin");
   const [navDrawerOpen, setNavDrawerOpen] = useState(false);
+
+  const activeLabel: string =
+    active === "settings"
+      ? "Settings"
+      : items.find((it) => it.key === active)?.label || "Overview";
+  const currentSettingsLabel: string | null =
+    settingsSection === "plan"
+      ? "Plan & Billing"
+      : settingsSection === "users"
+      ? "Users"
+      : settingsSection === "account"
+      ? "Account Settings"
+      : null;
 
   useEffect(() => {
     let mounted = true;
@@ -563,7 +577,12 @@ export default function Dashboard() {
           </svg>
         </button>
       )}
-      <main className="flex-1 p-6">
+      <main className="flex-1 px-6 pb-6 pt-0">
+        {/* Top sticky navbar showing current menu */}
+        <DashboardNavbar
+          title={activeLabel}
+          subtitle={active === "settings" ? currentSettingsLabel : null}
+        />
         <div className="mx-auto max-w-[120rem]">
           {active === "overview" && (
             <>
