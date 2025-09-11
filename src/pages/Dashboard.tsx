@@ -716,6 +716,48 @@ export default function Dashboard() {
               ? currentProductsLabel
               : null
           }
+          extra={
+            active === "products" && productsSection === "drink" ? (
+              <div className="flex items-center gap-3 sm:gap-4">
+                <div className="w-48 sm:w-64 md:w-80">
+                  <div className="relative">
+                    <svg
+                      className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2"
+                    >
+                      <circle cx="11" cy="11" r="8" />
+                      <path d="M21 21l-4.3-4.3" />
+                    </svg>
+                    <input
+                      type="text"
+                      placeholder="Search drinks…"
+                      aria-label="Search drinks"
+                      className="w-full rounded-md bg-white/10 border border-[color:var(--oe-border)] pl-9 pr-3 py-2 text-sm placeholder:text-gray-400 text-white focus:outline-none focus:ring-2 focus:ring-[var(--oe-green)]"
+                    />
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  className="inline-flex items-center gap-2 rounded-md bg-[var(--oe-green)] px-3 py-2 text-sm font-medium text-black hover:opacity-90 focus:outline-none focus:ring-2 focus:ring-[var(--oe-green)]/60"
+                >
+                  <svg
+                    className="h-4 w-4"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                  >
+                    <path d="M12 5v14" />
+                    <path d="M5 12h14" />
+                  </svg>
+                  <span>Add Product</span>
+                </button>
+              </div>
+            ) : null
+          }
         />
         <div className="mx-auto max-w-[120rem]">
           {active === "overview" && (
