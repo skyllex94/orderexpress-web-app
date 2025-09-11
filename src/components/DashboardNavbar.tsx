@@ -1,4 +1,4 @@
-import React from "react";
+// React import not required with modern JSX transform
 
 export default function DashboardNavbar({
   title,
@@ -8,12 +8,12 @@ export default function DashboardNavbar({
   subtitle?: string | null;
 }) {
   return (
-    <div className="sticky top-0 z-30 -mx-6 px-4 sm:px-6 bg-white/80 backdrop-blur supports-[backdrop-filter]:bg-white/60 border-b border-[color:var(--oe-border)]">
-      <div className="h-14 flex items-center">
-        <h1 className="text-base font-semibold text-[var(--oe-black)]">
+    <div className="sticky top-0 z-30 -mx-6 px-4 sm:px-6 bg-gradient-to-b from-[#0f1114] to-[#15181c] text-white border-b border-[color:var(--oe-border)]">
+      <div className="h-16 flex items-center pl-12 md:pl-0">
+        <h1 className="text-base font-semibold text-white">
           {title}
           {subtitle ? (
-            <span className="ml-2 text-sm text-gray-600">/ {subtitle}</span>
+            <span className="ml-2 text-sm text-gray-300">/ {subtitle}</span>
           ) : null}
         </h1>
       </div>
