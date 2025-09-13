@@ -6,7 +6,9 @@ import AddBusinessModal from "../components/AddBusinessModal";
 import InviteUserModal from "../components/InviteUserModal";
 import Overview from "./dashboard/Overview";
 import Inventory from "./dashboard/Inventory";
-import Ordering from "./dashboard/Ordering";
+// Ordering sub-pages
+import OrderingVendors from "./dashboard/ordering/Vendors";
+import OrderingCart from "./dashboard/ordering/Cart";
 import Analytics from "./dashboard/Analytics";
 import SettingsPanel from "./dashboard/Settings";
 import ProductsFood from "./dashboard/products/Food";
@@ -70,6 +72,10 @@ export default function Dashboard() {
   const [productsSection, setProductsSection] = useState<
     "food" | "drink" | "categories" | null
   >("food");
+  const [orderingOpen, setOrderingOpen] = useState(true);
+  const [orderingSection, setOrderingSection] = useState<
+    "vendors" | "cart" | null
+  >("vendors");
 
   const activeLabel: string =
     active === "settings"
@@ -92,6 +98,12 @@ export default function Dashboard() {
       ? "Drink Products"
       : productsSection === "categories"
       ? "Categories"
+      : null;
+  const currentOrderingLabel: string | null =
+    orderingSection === "vendors"
+      ? "Vendors"
+      : orderingSection === "cart"
+      ? "Cart"
       : null;
 
   useEffect(() => {
@@ -407,6 +419,11 @@ export default function Dashboard() {
                       setProductsOpen(!productsOpen);
                       return;
                     }
+                    if (it.key === "ordering") {
+                      setActive("ordering");
+                      setOrderingOpen(!orderingOpen);
+                      return;
+                    }
                     setActive(it.key);
                     setSettingsOpen(false);
                   }}
@@ -422,6 +439,19 @@ export default function Dashboard() {
                     <svg
                       className={`h-4 w-4 text-gray-400 transition-transform ${
                         productsOpen ? "rotate-180" : ""
+                      }`}
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2"
+                    >
+                      <path d="M6 9l6 6 6-6" />
+                    </svg>
+                  )}
+                  {!collapsed && it.key === "ordering" && (
+                    <svg
+                      className={`h-4 w-4 text-gray-400 transition-transform ${
+                        orderingOpen ? "rotate-180" : ""
                       }`}
                       viewBox="0 0 24 24"
                       fill="none"
@@ -512,6 +542,62 @@ export default function Dashboard() {
                           <path d="M13 13h7v7h-7z" />
                         </svg>
                         <span>Categories</span>
+                      </button>
+                    </div>
+                  )}
+
+                {it.key === "ordering" &&
+                  (
+                    ["admin", "inventory_manager", "ordering_manager"] as Role[]
+                  ).includes(currentRole) &&
+                  orderingOpen && (
+                    <div className="mt-1 space-y-1">
+                      <button
+                        onClick={() => {
+                          setActive("ordering");
+                          setOrderingSection("vendors");
+                        }}
+                        className={`w-full text-left flex items-center gap-3 rounded-md px-3 py-2 text-sm ${
+                          active === "ordering" && orderingSection === "vendors"
+                            ? "bg-white/10"
+                            : "hover:bg-white/5"
+                        }`}
+                      >
+                        <svg
+                          className="h-4 w-4 text-gray-400"
+                          viewBox="0 0 24 24"
+                          fill="none"
+                          stroke="currentColor"
+                          strokeWidth="2"
+                        >
+                          <path d="M3 7h18" />
+                          <path d="M6 10h12v10H6z" />
+                        </svg>
+                        <span>Vendors</span>
+                      </button>
+                      <button
+                        onClick={() => {
+                          setActive("ordering");
+                          setOrderingSection("cart");
+                        }}
+                        className={`w-full text-left flex items-center gap-3 rounded-md px-3 py-2 text-sm ${
+                          active === "ordering" && orderingSection === "cart"
+                            ? "bg-white/10"
+                            : "hover:bg-white/5"
+                        }`}
+                      >
+                        <svg
+                          className="h-4 w-4 text-gray-400"
+                          viewBox="0 0 24 24"
+                          fill="none"
+                          stroke="currentColor"
+                          strokeWidth="2"
+                        >
+                          <path d="M6 6h15l-1.5 9H7.5L6 6z" />
+                          <circle cx="9" cy="19" r="1" />
+                          <circle cx="18" cy="19" r="1" />
+                        </svg>
+                        <span>Cart</span>
                       </button>
                     </div>
                   )}
@@ -714,6 +800,8 @@ export default function Dashboard() {
               ? currentSettingsLabel
               : active === "products"
               ? currentProductsLabel
+              : active === "ordering"
+              ? currentOrderingLabel
               : null
           }
           extra={
@@ -756,6 +844,45 @@ export default function Dashboard() {
                   <span>Add Product</span>
                 </button>
               </div>
+            ) : active === "ordering" && orderingSection === "vendors" ? (
+              <div className="flex items-center gap-3 sm:gap-4">
+                <div className="w-48 sm:w-64 md:w-80">
+                  <div className="relative">
+                    <svg
+                      className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2"
+                    >
+                      <circle cx="11" cy="11" r="8" />
+                      <path d="M21 21l-4.3-4.3" />
+                    </svg>
+                    <input
+                      type="text"
+                      placeholder="Search vendors…"
+                      aria-label="Search vendors"
+                      className="w-full rounded-md bg-white/10 border border-[color:var(--oe-border)] pl-9 pr-3 py-2 text-sm placeholder:text-gray-400 text-white focus:outline-none focus:ring-2 focus:ring-[var(--oe-green)]"
+                    />
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  className="inline-flex items-center gap-2 rounded-md bg-[var(--oe-green)] px-3 py-2 text-sm font-medium text-black hover:opacity-90 focus:outline-none focus:ring-2 focus:ring-[var(--oe-green)]/60"
+                >
+                  <svg
+                    className="h-4 w-4"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                  >
+                    <path d="M12 5v14" />
+                    <path d="M5 12h14" />
+                  </svg>
+                  <span>Add a Vendor</span>
+                </button>
+              </div>
             ) : null
           }
         />
@@ -783,7 +910,12 @@ export default function Dashboard() {
               {productsSection === "categories" && <ProductsCategories />}
             </>
           )}
-          {active === "ordering" && <Ordering />}
+          {active === "ordering" && (
+            <>
+              {orderingSection === "vendors" && <OrderingVendors />}
+              {orderingSection === "cart" && <OrderingCart />}
+            </>
+          )}
           {active === "analytics" && <Analytics />}
           {active === "settings" && (
             <SettingsPanel businessId={businessId} section={settingsSection} />
