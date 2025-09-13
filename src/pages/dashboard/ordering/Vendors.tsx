@@ -84,9 +84,7 @@ export default function OrderingVendors() {
       .map((p) => p.toString().trim().toLowerCase())
       .filter(Boolean)
       .map((p) =>
-        p.startsWith("sun")
-          ? "Sunday"
-          : p.startsWith("mon")
+        p.startsWith("mon")
           ? "Monday"
           : p.startsWith("tue")
           ? "Tuesday"
@@ -98,6 +96,8 @@ export default function OrderingVendors() {
           ? "Friday"
           : p.startsWith("sat")
           ? "Saturday"
+          : p.startsWith("sun")
+          ? "Sunday"
           : ""
       )
       .filter(Boolean);
@@ -147,6 +147,7 @@ export default function OrderingVendors() {
       delivery_days: deliveryDaysFromVendor,
     });
     setVendorDirty(false);
+    setEditingName(false);
   }, [
     selectedVendor?.id,
     selectedVendor?.name,
@@ -172,9 +173,25 @@ export default function OrderingVendors() {
   const [saving, setSaving] = useState<boolean>(false);
   const [vendorDirty, setVendorDirty] = useState<boolean>(false);
   const [justSaved, setJustSaved] = useState<boolean>(false);
+  const [editingName, setEditingName] = useState<boolean>(false);
   async function saveVendorUpdates() {
     if (!selectedVendor?.id) return;
     setSaving(true);
+    // Validate newly added reps (require name and email)
+    const nextErrors: Record<string, { name?: string; email?: string }> = {};
+    const newReps = reps.filter((r) => r.id.startsWith("tmp_"));
+    newReps.forEach((r) => {
+      const errs: { name?: string; email?: string } = {};
+      if (!r.name?.trim()) errs.name = "Rep name is required";
+      if (!/.+@.+\..+/.test(r.email || ""))
+        errs.email = "Valid email is required";
+      if (errs.name || errs.email) nextErrors[r.id] = errs;
+    });
+    if (Object.keys(nextErrors).length > 0) {
+      setRepErrors(nextErrors);
+      setSaving(false);
+      return;
+    }
     // Convert delivery days to CSV of full names
     const deliveryCsv = Array.from(vendorForm.delivery_days).join(",");
     const updates: {
@@ -297,6 +314,9 @@ export default function OrderingVendors() {
   const [deletedRepIds, setDeletedRepIds] = useState<string[]>([]);
   const [confirmOpen, setConfirmOpen] = useState<boolean>(false);
   const [repToDelete, setRepToDelete] = useState<string | null>(null);
+  const [repErrors, setRepErrors] = useState<
+    Record<string, { name?: string; email?: string }>
+  >({});
 
   useEffect(() => {
     let mounted = true;
@@ -351,6 +371,33 @@ export default function OrderingVendors() {
       prev.map((r) => (r.id === id ? { ...r, [key]: value } : r))
     );
     setVendorDirty(true);
+
+    if (key === "name" || key === "email") {
+      setRepErrors((prev) => {
+        const next = { ...prev };
+        const curr = { ...(next[id] || {}) } as {
+          name?: string;
+          email?: string;
+        };
+        if (key === "name") {
+          const val = String(value || "");
+          if (val.trim()) delete curr.name;
+          else curr.name = "Rep name is required";
+        }
+        if (key === "email") {
+          const val = String(value || "");
+          const ok = /.+@.+\..+/.test(val);
+          if (ok) delete curr.email;
+          else curr.email = "Valid email is required";
+        }
+        if (!curr.name && !curr.email) {
+          delete next[id];
+        } else {
+          next[id] = curr;
+        }
+        return next;
+      });
+    }
   }
 
   function requestRemoveRep(id: string) {
@@ -372,7 +419,7 @@ export default function OrderingVendors() {
   }
 
   return (
-    <div className="grid grid-cols-12 gap-6">
+    <div className="grid grid-cols-12 gap-6 mt-6">
       {/* Left: Vendor list (1/4 width) */}
       <aside className="col-span-12 md:col-span-3">
         <div className="rounded-2xl bg-white shadow-sm ring-1 ring-gray-200 overflow-hidden">
@@ -425,10 +472,45 @@ export default function OrderingVendors() {
         <div className="rounded-2xl bg-white shadow-sm ring-1 ring-gray-200">
           {/* Header */}
           <div className="flex items-center justify-between gap-3 px-6 py-4 border-b border-gray-100">
-            <div className="min-w-0">
-              <h3 className="text-lg font-semibold text-[var(--oe-black)] truncate">
-                {selectedVendor?.name || "No vendor selected"}
-              </h3>
+            <div className="min-w-0 flex items-center gap-2">
+              {editingName && selectedVendor ? (
+                <input
+                  className="w-full max-w-xs rounded-md bg-gray-50 border border-transparent px-2 py-1 text-sm focus:border-[var(--oe-green)]/40 focus:ring-2 focus:ring-[var(--oe-green)]/30 outline-none"
+                  value={vendorForm.name}
+                  onChange={(e) => {
+                    setVendorForm((prev) => ({
+                      ...prev,
+                      name: e.target.value,
+                    }));
+                    setVendorDirty(true);
+                  }}
+                  placeholder="Vendor name"
+                  autoFocus
+                />
+              ) : (
+                <h3 className="text-lg font-semibold text-[var(--oe-black)] truncate">
+                  {selectedVendor?.name || "No vendor selected"}
+                </h3>
+              )}
+              {!editingName && selectedVendor && (
+                <button
+                  type="button"
+                  onClick={() => setEditingName(true)}
+                  className="shrink-0 rounded-md px-2 py-1 text-xs bg-black/5 hover:bg-black/10"
+                  aria-label="Edit vendor name"
+                >
+                  <svg
+                    className="h-3.5 w-3.5"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                  >
+                    <path d="M12 20h9" />
+                    <path d="M16.5 3.5a2.121 2.121 0 1 1 3 3L7 19l-4 1 1-4 12.5-12.5z" />
+                  </svg>
+                </button>
+              )}
             </div>
             <div className="flex items-center gap-3">
               {justSaved && (
@@ -510,7 +592,7 @@ export default function OrderingVendors() {
                 </div>
                 <div>
                   <label className="block text-xs font-medium text-gray-600">
-                    Internal Accounting ID
+                    Notes
                   </label>
                   <input
                     className="mt-1 w-full rounded-lg bg-gray-50 border border-transparent px-3 py-2 text-sm focus:border-[var(--oe-green)]/40 focus:ring-2 focus:ring-[var(--oe-green)]/30 outline-none"
@@ -527,38 +609,84 @@ export default function OrderingVendors() {
                 </div>
               </div>
 
-              {/* Right column */}
-              <div className="col-span-12 md:col-span-6 space-y-4">
-                <div>
-                  <label className="block text-xs font-medium text-gray-600">
-                    Address
-                  </label>
-                  <input
-                    className="mt-1 w-full rounded-lg bg-gray-50 border border-transparent px-3 py-2 text-sm focus:border-[var(--oe-green)]/40 focus:ring-2 focus:ring-[var(--oe-green)]/30 outline-none"
-                    placeholder="Address Line 1"
-                    readOnly
-                  />
+              {/* Right column: Delivery days */}
+              <div className="col-span-12 md:col-span-6">
+                <div className="rounded-xl bg-gray-50 p-4">
+                  <div className="text-sm font-medium text-[var(--oe-black)]">
+                    Delivery days
+                  </div>
+                  <div className="mt-3 grid grid-cols-2 sm:grid-cols-3 gap-y-2 gap-x-4 text-sm">
+                    {[
+                      "Monday",
+                      "Tuesday",
+                      "Wednesday",
+                      "Thursday",
+                      "Friday",
+                      "Saturday",
+                      "Sunday",
+                    ].map((d) => (
+                      <label
+                        key={d}
+                        className="inline-flex items-center gap-2 text-gray-700"
+                      >
+                        <input
+                          type="checkbox"
+                          className="h-4 w-4 rounded border-gray-300"
+                          checked={vendorForm.delivery_days.has(d)}
+                          onChange={() => toggleDeliveryDay(d)}
+                        />
+                        <span>{d}</span>
+                      </label>
+                    ))}
+                  </div>
                 </div>
-                <input
-                  className="w-full rounded-lg bg-gray-50 border border-transparent px-3 py-2 text-sm focus:border-[var(--oe-green)]/40 focus:ring-2 focus:ring-[var(--oe-green)]/30 outline-none"
-                  placeholder="Address Line 2"
-                  readOnly
-                />
-                <input
-                  className="w-full rounded-lg bg-gray-50 border border-transparent px-3 py-2 text-sm focus:border-[var(--oe-green)]/40 focus:ring-2 focus:ring-[var(--oe-green)]/30 outline-none"
-                  placeholder="City"
-                  readOnly
-                />
-                <input
-                  className="w-full rounded-lg bg-gray-50 border border-transparent px-3 py-2 text-sm focus:border-[var(--oe-green)]/40 focus:ring-2 focus:ring-[var(--oe-green)]/30 outline-none"
-                  placeholder="State/Province/Region"
-                  readOnly
-                />
-                <input
-                  className="w-full rounded-lg bg-gray-50 border border-transparent px-3 py-2 text-sm focus:border-[var(--oe-green)]/40 focus:ring-2 focus:ring-[var(--oe-green)]/30 outline-none"
-                  placeholder="Zip/Postal Code"
-                  readOnly
-                />
+
+                {/* Minimums */}
+                <div className="mt-2 grid grid-cols-12 gap-4">
+                  <div className="col-span-12">
+                    <div>
+                      <label className="block text-xs font-medium text-gray-600">
+                        Case minimum
+                      </label>
+                      <input
+                        type="number"
+                        className="mt-1 w-full rounded-lg bg-gray-50 border border-transparent px-3 py-2 text-sm focus:border-[var(--oe-green)]/40 focus:ring-2 focus:ring-[var(--oe-green)]/30 outline-none"
+                        placeholder="0"
+                        value={vendorForm.case_min}
+                        onChange={(e) => {
+                          setVendorForm((prev) => ({
+                            ...prev,
+                            case_min: e.target.value,
+                          }));
+                          setVendorDirty(true);
+                        }}
+                      />
+                    </div>
+                    <div className="mt-4">
+                      <label className="block text-xs font-medium text-gray-600">
+                        Dollar minimum
+                      </label>
+                      <div className="relative">
+                        <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-gray-500">
+                          $
+                        </span>
+                        <input
+                          type="number"
+                          className="mt-1 w-full rounded-lg bg-gray-50 border border-transparent pl-7 px-3 py-2 text-sm focus:border-[var(--oe-green)]/40 focus:ring-2 focus:ring-[var(--oe-green)]/30 outline-none"
+                          placeholder="0"
+                          value={vendorForm.dollar_min}
+                          onChange={(e) => {
+                            setVendorForm((prev) => ({
+                              ...prev,
+                              dollar_min: e.target.value,
+                            }));
+                            setVendorDirty(true);
+                          }}
+                        />
+                      </div>
+                    </div>
+                  </div>
+                </div>
               </div>
             </div>
 
@@ -596,6 +724,11 @@ export default function OrderingVendors() {
                               updateRep(rep.id, "name", e.target.value)
                             }
                           />
+                          {repErrors[rep.id]?.name && (
+                            <div className="mt-1 text-xs text-red-600">
+                              {repErrors[rep.id]?.name}
+                            </div>
+                          )}
                         </div>
                         <div className="col-span-12 md:col-span-5">
                           <label className="block text-xs font-medium text-gray-600">
@@ -610,6 +743,11 @@ export default function OrderingVendors() {
                               updateRep(rep.id, "email", e.target.value)
                             }
                           />
+                          {repErrors[rep.id]?.email && (
+                            <div className="mt-1 text-xs text-red-600">
+                              {repErrors[rep.id]?.email}
+                            </div>
+                          )}
                         </div>
                         <div className="col-span-12 md:col-span-3">
                           <label className="block text-xs font-medium text-gray-600">
@@ -637,17 +775,6 @@ export default function OrderingVendors() {
                             }
                           />
                           <span>Send orders via email</span>
-                        </label>
-                        <label className="inline-flex items-center gap-2 text-sm text-gray-700">
-                          <input
-                            type="checkbox"
-                            className="h-4 w-4 rounded border-gray-300"
-                            checked={rep.attachCsv}
-                            onChange={(e) =>
-                              updateRep(rep.id, "attachCsv", e.target.checked)
-                            }
-                          />
-                          <span>Attach order CSV to email</span>
                         </label>
                         <label className="inline-flex items-center gap-2 text-sm text-gray-700">
                           <input
@@ -715,84 +842,6 @@ export default function OrderingVendors() {
                 setRepToDelete(null);
               }}
             />
-
-            {/* Delivery days + minimums */}
-            <div className="grid grid-cols-12 gap-6">
-              <div className="col-span-12 md:col-span-6">
-                <div className="rounded-xl bg-gray-50 p-4">
-                  <div className="text-sm font-medium text-[var(--oe-black)]">
-                    Delivery days
-                  </div>
-                  <div className="mt-3 grid grid-cols-2 sm:grid-cols-3 gap-y-2 gap-x-4 text-sm">
-                    {[
-                      "Sunday",
-                      "Monday",
-                      "Tuesday",
-                      "Wednesday",
-                      "Thursday",
-                      "Friday",
-                      "Saturday",
-                    ].map((d) => (
-                      <label
-                        key={d}
-                        className="inline-flex items-center gap-2 text-gray-700"
-                      >
-                        <input
-                          type="checkbox"
-                          className="h-4 w-4 rounded border-gray-300"
-                          checked={vendorForm.delivery_days.has(d)}
-                          onChange={() => toggleDeliveryDay(d)}
-                        />
-                        <span>{d}</span>
-                      </label>
-                    ))}
-                  </div>
-                </div>
-              </div>
-              <div className="col-span-12 md:col-span-6 grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-xs font-medium text-gray-600">
-                    Case minimum
-                  </label>
-                  <input
-                    type="number"
-                    className="mt-1 w-full rounded-lg bg-gray-50 border border-transparent px-3 py-2 text-sm focus:border-[var(--oe-green)]/40 focus:ring-2 focus:ring-[var(--oe-green)]/30 outline-none"
-                    placeholder="0"
-                    value={vendorForm.case_min}
-                    onChange={(e) => {
-                      setVendorForm((prev) => ({
-                        ...prev,
-                        case_min: e.target.value,
-                      }));
-                      setVendorDirty(true);
-                    }}
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs font-medium text-gray-600">
-                    Dollar minimum
-                  </label>
-                  <div className="relative">
-                    <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-gray-500">
-                      $
-                    </span>
-                    <input
-                      type="number"
-                      className="mt-1 w-full rounded-lg bg-gray-50 border border-transparent pl-7 px-3 py-2 text-sm focus:border-[var(--oe-green)]/40 focus:ring-2 focus:ring-[var(--oe-green)]/30 outline-none"
-                      placeholder="0"
-                      value={vendorForm.dollar_min}
-                      onChange={(e) => {
-                        setVendorForm((prev) => ({
-                          ...prev,
-                          dollar_min: e.target.value,
-                        }));
-                        setVendorDirty(true);
-                      }}
-                    />
-                  </div>
-                </div>
-              </div>
-            </div>
           </div>
         </div>
       </section>
