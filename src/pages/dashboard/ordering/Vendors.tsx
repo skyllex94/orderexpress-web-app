@@ -1,4 +1,5 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import ConfirmModal from "../../../components/ConfirmModal";
 import { supabase } from "../../../services/supabase";
 
 type Vendor = {
@@ -67,7 +68,7 @@ export default function OrderingVendors() {
       ? vendors[Math.min(selectedIndex, vendors.length - 1)]
       : null;
 
-  const deliveryDaysFromVendor = (() => {
+  const deliveryDaysFromVendor = useMemo(() => {
     if (!selectedVendor?.delivery_days) return new Set<string>();
     const raw = selectedVendor.delivery_days.trim();
     let parts: string[] = [];
@@ -101,7 +102,175 @@ export default function OrderingVendors() {
       )
       .filter(Boolean);
     return new Set<string>(norm);
-  })();
+  }, [selectedVendor?.delivery_days]);
+
+  type VendorForm = {
+    name: string;
+    account_number: string;
+    office_phone: string;
+    website: string;
+    notes: string;
+    case_min: string; // keep as string for input control
+    dollar_min: string; // keep as string
+    delivery_days: Set<string>;
+  };
+
+  const [vendorForm, setVendorForm] = useState<VendorForm>({
+    name: "",
+    account_number: "",
+    office_phone: "",
+    website: "",
+    notes: "",
+    case_min: "",
+    dollar_min: "",
+    delivery_days: new Set<string>(),
+  });
+
+  useEffect(() => {
+    // Initialize form when vendor changes
+    setVendorForm({
+      name: selectedVendor?.name || "",
+      account_number: selectedVendor?.account_number || "",
+      office_phone: selectedVendor?.office_phone || "",
+      website: selectedVendor?.website || "",
+      notes: selectedVendor?.notes || "",
+      case_min:
+        selectedVendor?.case_min === null ||
+        selectedVendor?.case_min === undefined
+          ? ""
+          : String(selectedVendor?.case_min),
+      dollar_min:
+        selectedVendor?.dollar_min === null ||
+        selectedVendor?.dollar_min === undefined
+          ? ""
+          : String(selectedVendor?.dollar_min),
+      delivery_days: deliveryDaysFromVendor,
+    });
+    setVendorDirty(false);
+  }, [
+    selectedVendor?.id,
+    selectedVendor?.name,
+    selectedVendor?.account_number,
+    selectedVendor?.office_phone,
+    selectedVendor?.website,
+    selectedVendor?.notes,
+    selectedVendor?.case_min,
+    selectedVendor?.dollar_min,
+    deliveryDaysFromVendor,
+  ]);
+
+  function toggleDeliveryDay(day: string): void {
+    setVendorForm((prev) => {
+      const next = new Set(prev.delivery_days);
+      if (next.has(day)) next.delete(day);
+      else next.add(day);
+      return { ...prev, delivery_days: next };
+    });
+    setVendorDirty(true);
+  }
+
+  const [saving, setSaving] = useState<boolean>(false);
+  const [vendorDirty, setVendorDirty] = useState<boolean>(false);
+  const [justSaved, setJustSaved] = useState<boolean>(false);
+  async function saveVendorUpdates() {
+    if (!selectedVendor?.id) return;
+    setSaving(true);
+    // Convert delivery days to CSV of full names
+    const deliveryCsv = Array.from(vendorForm.delivery_days).join(",");
+    const updates: {
+      name: string;
+      account_number: string | null;
+      office_phone: string | null;
+      website: string | null;
+      notes: string | null;
+      case_min: number | null;
+      dollar_min: number | null;
+      delivery_days: string | null;
+      updated_at: string;
+    } = {
+      name: vendorForm.name.trim(),
+      account_number: vendorForm.account_number.trim() || null,
+      office_phone: vendorForm.office_phone.trim() || null,
+      website: vendorForm.website.trim() || null,
+      notes: vendorForm.notes.trim() || null,
+      case_min:
+        vendorForm.case_min === ""
+          ? null
+          : Math.max(0, parseInt(vendorForm.case_min, 10) || 0),
+      dollar_min:
+        vendorForm.dollar_min === ""
+          ? null
+          : (Number(vendorForm.dollar_min) as number),
+      delivery_days: deliveryCsv || null,
+      updated_at: new Date().toISOString(),
+    };
+    const { error: err } = await supabase
+      .from("vendors")
+      .update(updates)
+      .eq("id", selectedVendor.id);
+    if (!err) {
+      // Persist reps changes (UI-based):
+      // 1) Delete reps marked for deletion
+      if (deletedRepIds.length > 0) {
+        await supabase.from("vendors_reps").delete().in("id", deletedRepIds);
+        setDeletedRepIds([]);
+      }
+      // 2) Split reps into new (tmp_ ids) and existing; insert new with select to fetch IDs, update existing
+      const newReps = reps.filter((r) => r.id.startsWith("tmp_"));
+      const existingReps = reps.filter((r) => !r.id.startsWith("tmp_"));
+      if (newReps.length > 0) {
+        const { data: inserted } = await supabase
+          .from("vendors_reps")
+          .insert(
+            newReps.map((r) => ({
+              vendor_id: selectedVendor.id,
+              name: r.name?.trim() || "",
+              email: r.email?.trim() || null,
+              phone: r.phone?.trim() || null,
+            }))
+          )
+          .select();
+        if (inserted && inserted.length > 0) {
+          // Replace tmp ids with real ids
+          let idx = 0;
+          setReps((prev) =>
+            prev.map((r) =>
+              r.id.startsWith("tmp_")
+                ? { ...r, id: (inserted[idx++]?.id as string) || r.id }
+                : r
+            )
+          );
+        }
+      }
+      if (existingReps.length > 0) {
+        await Promise.all(
+          existingReps.map((r) =>
+            supabase
+              .from("vendors_reps")
+              .update({
+                name: r.name?.trim() || "",
+                email: r.email?.trim() || null,
+                phone: r.phone?.trim() || null,
+              })
+              .eq("id", r.id)
+          )
+        );
+      }
+
+      // Reflect vendor changes locally in the list
+      setVendors((prev) =>
+        (prev || []).map((v) =>
+          v.id === selectedVendor.id ? { ...v, ...updates } : v
+        )
+      );
+
+      // Mark as saved and disable the Save button again
+      setVendorDirty(false);
+      setJustSaved(true);
+      setTimeout(() => setJustSaved(false), 2500);
+    }
+    setSaving(false);
+  }
 
   type RepForm = {
     id: string;
@@ -114,7 +283,7 @@ export default function OrderingVendors() {
   };
 
   const createEmptyRep = (): RepForm => ({
-    id: `${Date.now()}-${Math.random().toString(36).slice(2)}`,
+    id: `tmp_${Date.now()}_${Math.random().toString(36).slice(2)}`,
     name: "",
     email: "",
     phone: "",
@@ -125,6 +294,9 @@ export default function OrderingVendors() {
 
   const [reps, setReps] = useState<RepForm[]>([]);
   const [repsLoading, setRepsLoading] = useState<boolean>(false);
+  const [deletedRepIds, setDeletedRepIds] = useState<string[]>([]);
+  const [confirmOpen, setConfirmOpen] = useState<boolean>(false);
+  const [repToDelete, setRepToDelete] = useState<string | null>(null);
 
   useEffect(() => {
     let mounted = true;
@@ -144,15 +316,22 @@ export default function OrderingVendors() {
         // On error, just show empty and allow adding manually
         setReps([]);
       } else {
-        const mapped: RepForm[] = (data || []).map((r: any) => ({
-          id: r.id as string,
-          name: (r.name as string) || "",
-          email: (r.email as string) || "",
-          phone: (r.phone as string) || "",
-          sendEmail: false,
-          attachCsv: false,
-          sendText: false,
-        }));
+        const mapped: RepForm[] = (data || []).map(
+          (r: {
+            id: string;
+            name: string;
+            email: string | null;
+            phone: string | null;
+          }) => ({
+            id: r.id,
+            name: r.name || "",
+            email: r.email || "",
+            phone: r.phone || "",
+            sendEmail: false,
+            attachCsv: false,
+            sendText: false,
+          })
+        );
         setReps(mapped);
       }
       setRepsLoading(false);
@@ -171,10 +350,25 @@ export default function OrderingVendors() {
     setReps((prev) =>
       prev.map((r) => (r.id === id ? { ...r, [key]: value } : r))
     );
+    setVendorDirty(true);
   }
 
-  function removeRep(id: string) {
+  function requestRemoveRep(id: string) {
+    setRepToDelete(id);
+    setConfirmOpen(true);
+  }
+
+  async function actuallyRemoveRep() {
+    if (!repToDelete) return;
+    const id = repToDelete;
+    if (!id.startsWith("tmp_")) {
+      await supabase.from("vendors_reps").delete().eq("id", id);
+      // Ensure not queued anymore
+      setDeletedRepIds((prev) => prev.filter((d) => d !== id));
+    }
     setReps((prev) => prev.filter((r) => r.id !== id));
+    setRepToDelete(null);
+    setConfirmOpen(false);
   }
 
   return (
@@ -236,12 +430,25 @@ export default function OrderingVendors() {
                 {selectedVendor?.name || "No vendor selected"}
               </h3>
             </div>
-            <button
-              type="button"
-              className="rounded-md bg-[var(--oe-green)] px-3 py-2 text-sm font-medium text-black hover:opacity-90"
-            >
-              SAVE
-            </button>
+            <div className="flex items-center gap-3">
+              {justSaved && (
+                <span className="text-xs font-medium text-green-600">
+                  Saved
+                </span>
+              )}
+              <button
+                type="button"
+                onClick={saveVendorUpdates}
+                disabled={saving || !selectedVendor || !vendorDirty}
+                className={`rounded-md px-3 py-2 text-sm font-medium ${
+                  saving || !selectedVendor || !vendorDirty
+                    ? "bg-gray-300 text-gray-700 cursor-not-allowed"
+                    : "bg-[var(--oe-green)] text-black hover:opacity-90"
+                }`}
+              >
+                {saving ? "Saving…" : "SAVE"}
+              </button>
+            </div>
           </div>
 
           {/* Body */}
@@ -257,8 +464,14 @@ export default function OrderingVendors() {
                   <input
                     className="mt-1 w-full rounded-lg bg-gray-50 border border-transparent px-3 py-2 text-sm focus:border-[var(--oe-green)]/40 focus:ring-2 focus:ring-[var(--oe-green)]/30 outline-none"
                     placeholder=""
-                    value={selectedVendor?.account_number || ""}
-                    readOnly
+                    value={vendorForm.account_number}
+                    onChange={(e) => {
+                      setVendorForm((prev) => ({
+                        ...prev,
+                        account_number: e.target.value,
+                      }));
+                      setVendorDirty(true);
+                    }}
                   />
                 </div>
                 <div>
@@ -268,8 +481,14 @@ export default function OrderingVendors() {
                   <input
                     className="mt-1 w-full rounded-lg bg-gray-50 border border-transparent px-3 py-2 text-sm focus:border-[var(--oe-green)]/40 focus:ring-2 focus:ring-[var(--oe-green)]/30 outline-none"
                     placeholder=""
-                    value={selectedVendor?.office_phone || ""}
-                    readOnly
+                    value={vendorForm.office_phone}
+                    onChange={(e) => {
+                      setVendorForm((prev) => ({
+                        ...prev,
+                        office_phone: e.target.value,
+                      }));
+                      setVendorDirty(true);
+                    }}
                   />
                 </div>
                 <div>
@@ -279,8 +498,14 @@ export default function OrderingVendors() {
                   <input
                     className="mt-1 w-full rounded-lg bg-gray-50 border border-transparent px-3 py-2 text-sm focus:border-[var(--oe-green)]/40 focus:ring-2 focus:ring-[var(--oe-green)]/30 outline-none"
                     placeholder="https://"
-                    value={selectedVendor?.website || ""}
-                    readOnly
+                    value={vendorForm.website}
+                    onChange={(e) => {
+                      setVendorForm((prev) => ({
+                        ...prev,
+                        website: e.target.value,
+                      }));
+                      setVendorDirty(true);
+                    }}
                   />
                 </div>
                 <div>
@@ -290,8 +515,14 @@ export default function OrderingVendors() {
                   <input
                     className="mt-1 w-full rounded-lg bg-gray-50 border border-transparent px-3 py-2 text-sm focus:border-[var(--oe-green)]/40 focus:ring-2 focus:ring-[var(--oe-green)]/30 outline-none"
                     placeholder=""
-                    value={selectedVendor?.notes || ""}
-                    readOnly
+                    value={vendorForm.notes}
+                    onChange={(e) => {
+                      setVendorForm((prev) => ({
+                        ...prev,
+                        notes: e.target.value,
+                      }));
+                      setVendorDirty(true);
+                    }}
                   />
                 </div>
               </div>
@@ -346,7 +577,7 @@ export default function OrderingVendors() {
                 )}
                 {!repsLoading &&
                   reps.length > 0 &&
-                  reps.map((rep, idx) => (
+                  reps.map((rep) => (
                     <div
                       key={rep.id}
                       className="rounded-xl ring-1 ring-gray-200 p-4"
@@ -433,7 +664,7 @@ export default function OrderingVendors() {
                         {reps.length > 1 && (
                           <button
                             type="button"
-                            onClick={() => removeRep(rep.id)}
+                            onClick={() => requestRemoveRep(rep.id)}
                             className="ml-auto text-sm text-red-600 hover:underline"
                           >
                             Delete rep
@@ -447,7 +678,10 @@ export default function OrderingVendors() {
               <div className="pt-1">
                 <button
                   type="button"
-                  onClick={() => setReps((prev) => [...prev, createEmptyRep()])}
+                  onClick={() => {
+                    setReps((prev) => [...prev, createEmptyRep()]);
+                    setVendorDirty(true);
+                  }}
                   className="inline-flex items-center gap-2 text-sm rounded-md border border-gray-200 px-3 py-2 hover:bg-gray-50"
                 >
                   <svg
@@ -464,6 +698,23 @@ export default function OrderingVendors() {
                 </button>
               </div>
             </div>
+
+            <ConfirmModal
+              isOpen={confirmOpen}
+              title="Delete rep?"
+              message={
+                <span>
+                  This action cannot be undone. Proceed with deletion?
+                </span>
+              }
+              confirmLabel="Delete"
+              cancelLabel="Cancel"
+              onConfirm={actuallyRemoveRep}
+              onClose={() => {
+                setConfirmOpen(false);
+                setRepToDelete(null);
+              }}
+            />
 
             {/* Delivery days + minimums */}
             <div className="grid grid-cols-12 gap-6">
@@ -489,8 +740,8 @@ export default function OrderingVendors() {
                         <input
                           type="checkbox"
                           className="h-4 w-4 rounded border-gray-300"
-                          checked={deliveryDaysFromVendor.has(d)}
-                          readOnly
+                          checked={vendorForm.delivery_days.has(d)}
+                          onChange={() => toggleDeliveryDay(d)}
                         />
                         <span>{d}</span>
                       </label>
@@ -507,8 +758,14 @@ export default function OrderingVendors() {
                     type="number"
                     className="mt-1 w-full rounded-lg bg-gray-50 border border-transparent px-3 py-2 text-sm focus:border-[var(--oe-green)]/40 focus:ring-2 focus:ring-[var(--oe-green)]/30 outline-none"
                     placeholder="0"
-                    value={selectedVendor?.case_min ?? ""}
-                    readOnly
+                    value={vendorForm.case_min}
+                    onChange={(e) => {
+                      setVendorForm((prev) => ({
+                        ...prev,
+                        case_min: e.target.value,
+                      }));
+                      setVendorDirty(true);
+                    }}
                   />
                 </div>
                 <div>
@@ -523,8 +780,14 @@ export default function OrderingVendors() {
                       type="number"
                       className="mt-1 w-full rounded-lg bg-gray-50 border border-transparent pl-7 px-3 py-2 text-sm focus:border-[var(--oe-green)]/40 focus:ring-2 focus:ring-[var(--oe-green)]/30 outline-none"
                       placeholder="0"
-                      value={selectedVendor?.dollar_min ?? ""}
-                      readOnly
+                      value={vendorForm.dollar_min}
+                      onChange={(e) => {
+                        setVendorForm((prev) => ({
+                          ...prev,
+                          dollar_min: e.target.value,
+                        }));
+                        setVendorDirty(true);
+                      }}
                     />
                   </div>
                 </div>
