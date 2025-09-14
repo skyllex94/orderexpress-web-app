@@ -12,11 +12,57 @@ export default function DrinkProductDrawer({
   const overlayRef = useRef<HTMLDivElement>(null);
   const [name, setName] = useState("");
   const [brand, setBrand] = useState("");
+  // Packaging form state
+  type PackagingForm = {
+    id: string;
+    caseSize: string;
+    unitSize: string;
+    measureType: string;
+    unitType: string;
+    notes: string;
+  };
+  const measureOptions = [
+    "L",
+    "mL",
+    "cL",
+    "gal",
+    "qt",
+    "pt",
+    "fl.oz",
+    "bsp",
+    "unit",
+    "g",
+    "kg",
+    "lbs",
+    "oz",
+  ];
+  const unitTypeOptions = [
+    "bottle",
+    "can",
+    "keg",
+    "bag",
+    "box",
+    "can(food)",
+    "carton",
+    "container",
+    "package",
+    "other",
+  ];
   const [category, setCategory] = useState("");
   const [vendor, setVendor] = useState("");
   const [unitSize, setUnitSize] = useState("");
   const [unitType, setUnitType] = useState("");
   const [cost, setCost] = useState("");
+  const [packaging, setPackaging] = useState<PackagingForm[]>([
+    {
+      id: `pkg_${Date.now()}`,
+      caseSize: "",
+      unitSize: "",
+      measureType: "",
+      unitType: "",
+      notes: "",
+    },
+  ]);
 
   useEffect(() => {
     function onEsc(e: KeyboardEvent) {
@@ -36,6 +82,16 @@ export default function DrinkProductDrawer({
       setUnitSize("");
       setUnitType("");
       setCost("");
+      setPackaging([
+        {
+          id: `pkg_${Date.now()}`,
+          caseSize: "",
+          unitSize: "",
+          measureType: "",
+          unitType: "",
+          notes: "",
+        },
+      ]);
     }
   }, [open]);
 
@@ -115,6 +171,162 @@ export default function DrinkProductDrawer({
               value={brand}
               onChange={(e) => setBrand(e.target.value)}
             />
+          </div>
+          {/* Packaging group */}
+          <div className="rounded-xl bg-white ring-1 ring-gray-200 p-4">
+            <div className="flex items-center justify-between">
+              <h4 className="text-sm font-semibold text-[var(--oe-black)]">
+                Packaging
+              </h4>
+            </div>
+            <div className="mt-3 space-y-4">
+              {packaging.map((pkg) => (
+                <div key={pkg.id} className="space-y-3">
+                  <div className="grid grid-cols-12 gap-3">
+                    <div className="col-span-3">
+                      <label className="block text-xs font-medium text-gray-700">
+                        Case size
+                      </label>
+                      <input
+                        className="mt-1 w-full rounded-lg bg-gray-50 border border-transparent px-3 py-2 text-sm focus:border-[var(--oe-green)]/40 focus:ring-2 focus:ring-[var(--oe-green)]/30 outline-none"
+                        placeholder="e.g., 12"
+                        value={pkg.caseSize}
+                        onChange={(e) =>
+                          setPackaging((prev) =>
+                            prev.map((p) =>
+                              p.id === pkg.id
+                                ? { ...p, caseSize: e.target.value }
+                                : p
+                            )
+                          )
+                        }
+                      />
+                    </div>
+                    <div className="col-span-3">
+                      <label className="block text-xs font-medium text-gray-700">
+                        Unit size
+                      </label>
+                      <input
+                        className="mt-1 w-full rounded-lg bg-gray-50 border border-transparent px-3 py-2 text-sm focus:border-[var(--oe-green)]/40 focus:ring-2 focus:ring-[var(--oe-green)]/30 outline-none"
+                        placeholder="e.g., 750"
+                        value={pkg.unitSize}
+                        onChange={(e) =>
+                          setPackaging((prev) =>
+                            prev.map((p) =>
+                              p.id === pkg.id
+                                ? { ...p, unitSize: e.target.value }
+                                : p
+                            )
+                          )
+                        }
+                      />
+                    </div>
+                    <div className="col-span-3">
+                      <label className="block text-xs font-medium text-gray-700">
+                        Measure
+                      </label>
+                      <select
+                        className="mt-1 w-full rounded-lg bg-gray-50 border border-transparent px-2 py-2 text-sm focus:border-[var(--oe-green)]/40 focus:ring-2 focus:ring-[var(--oe-green)]/30 outline-none"
+                        value={pkg.measureType}
+                        onChange={(e) =>
+                          setPackaging((prev) =>
+                            prev.map((p) =>
+                              p.id === pkg.id
+                                ? { ...p, measureType: e.target.value }
+                                : p
+                            )
+                          )
+                        }
+                      >
+                        <option value="">Select…</option>
+                        {measureOptions.map((opt) => (
+                          <option key={opt} value={opt}>
+                            {opt}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                    <div className="col-span-3">
+                      <label className="block text-xs font-medium text-gray-700">
+                        Unit type
+                      </label>
+                      <select
+                        className="mt-1 w-full rounded-lg bg-gray-50 border border-transparent px-2 py-2 text-sm focus:border-[var(--oe-green)]/40 focus:ring-2 focus:ring-[var(--oe-green)]/30 outline-none"
+                        value={pkg.unitType}
+                        onChange={(e) =>
+                          setPackaging((prev) =>
+                            prev.map((p) =>
+                              p.id === pkg.id
+                                ? { ...p, unitType: e.target.value }
+                                : p
+                            )
+                          )
+                        }
+                      >
+                        <option value="">Select…</option>
+                        {unitTypeOptions.map((opt) => (
+                          <option key={opt} value={opt}>
+                            {opt}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-gray-700">
+                      Notes
+                    </label>
+                    <input
+                      className="mt-1 w-full rounded-lg bg-gray-50 border border-transparent px-3 py-2 text-sm focus:border-[var(--oe-green)]/40 focus:ring-2 focus:ring-[var(--oe-green)]/30 outline-none"
+                      placeholder="Optional notes…"
+                      value={pkg.notes}
+                      onChange={(e) =>
+                        setPackaging((prev) =>
+                          prev.map((p) =>
+                            p.id === pkg.id
+                              ? { ...p, notes: e.target.value }
+                              : p
+                          )
+                        )
+                      }
+                    />
+                  </div>
+                </div>
+              ))}
+            </div>
+            <div className="mt-4">
+              <button
+                type="button"
+                onClick={() =>
+                  setPackaging((prev) => [
+                    ...prev,
+                    {
+                      id: `pkg_${Date.now()}_${Math.random()
+                        .toString(36)
+                        .slice(2)}`,
+                      caseSize: "",
+                      unitSize: "",
+                      measureType: "",
+                      unitType: "",
+                      notes: "",
+                    },
+                  ])
+                }
+                className="inline-flex items-center gap-2 rounded-md bg-black/5 px-3 py-2 text-sm text-[var(--oe-black)] hover:bg-black/10"
+              >
+                <svg
+                  className="h-4 w-4"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                >
+                  <path d="M12 5v14" />
+                  <path d="M5 12h14" />
+                </svg>
+                Add packaging
+              </button>
+            </div>
           </div>
           <div>
             <label className="block text-xs font-medium text-gray-700">
