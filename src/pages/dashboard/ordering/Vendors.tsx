@@ -180,6 +180,8 @@ export default function OrderingVendors({
   const [vendorDirty, setVendorDirty] = useState<boolean>(false);
   const [justSaved, setJustSaved] = useState<boolean>(false);
   const [editingName, setEditingName] = useState<boolean>(false);
+  const [vendorConfirmOpen, setVendorConfirmOpen] = useState<boolean>(false);
+  const [deletingVendor, setDeletingVendor] = useState<boolean>(false);
   async function saveVendorUpdates() {
     if (!selectedVendor?.id) return;
     setSaving(true);
@@ -295,6 +297,32 @@ export default function OrderingVendors({
     setSaving(false);
   }
 
+  async function confirmDeleteVendor() {
+    if (!selectedVendor?.id) return;
+    setDeletingVendor(true);
+    try {
+      const currentId = selectedVendor.id;
+      const { error } = await supabase
+        .from("vendors")
+        .delete()
+        .eq("id", currentId);
+      if (!error) {
+        setVendors((prev) => (prev || []).filter((v) => v.id !== currentId));
+        // choose next selection
+        const idx = Math.min(
+          selectedIndex,
+          Math.max(0, (vendors?.length || 1) - 2)
+        );
+        setSelectedIndex(idx);
+        setVendorDirty(false);
+        setEditingName(false);
+      }
+    } finally {
+      setDeletingVendor(false);
+      setVendorConfirmOpen(false);
+    }
+  }
+
   type RepForm = {
     id: string;
     name: string;
@@ -329,6 +357,9 @@ export default function OrderingVendors({
 
   useEffect(() => {
     if (addVendorOpen) setCreateOpen(true);
+  }, [addVendorOpen]);
+
+  useEffect(() => {
     let mounted = true;
     async function loadReps() {
       if (!selectedVendor?.id) {
@@ -370,7 +401,7 @@ export default function OrderingVendors({
     return () => {
       mounted = false;
     };
-  }, [selectedVendor?.id, addVendorOpen]);
+  }, [selectedVendor?.id]);
 
   function updateRep<K extends keyof RepForm>(
     id: string,
@@ -502,6 +533,79 @@ export default function OrderingVendors({
                     placeholder="e.g., Ruby Wines"
                     value={newVendorName}
                     onChange={(e) => setNewVendorName(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        (async () => {
+                          // Reuse the same add logic as the button
+                          if (!newVendorName.trim() || creating) return;
+                          await supabase.auth.getSession();
+                          let businessId: string | null = null;
+                          try {
+                            businessId = localStorage.getItem(
+                              "oe_current_business_id"
+                            );
+                          } catch {
+                            /* ignore */
+                          }
+                          if (!businessId) return;
+                          setCreating(true);
+                          const { data, error } = await supabase
+                            .from("vendors")
+                            .insert({
+                              business_id: businessId,
+                              name: newVendorName.trim(),
+                            })
+                            .select();
+                          setCreating(false);
+                          if (!error && data && data[0]) {
+                            const v = data[0] as { id: string; name: string };
+                            setVendors((prev) => {
+                              const list = [
+                                ...(prev || []),
+                                {
+                                  id: v.id,
+                                  business_id: businessId!,
+                                  name: v.name,
+                                  notes: null,
+                                  account_number: null,
+                                  office_phone: null,
+                                  website: null,
+                                  delivery_days: null,
+                                  case_min: null,
+                                  dollar_min: null,
+                                },
+                              ];
+                              return list.sort((a, b) =>
+                                a.name.localeCompare(b.name)
+                              );
+                            });
+                            const idx = (vendors || [])
+                              .concat([
+                                {
+                                  id: v.id,
+                                  business_id: businessId!,
+                                  name: v.name,
+                                  notes: null,
+                                  account_number: null,
+                                  office_phone: null,
+                                  website: null,
+                                  delivery_days: null,
+                                  case_min: null,
+                                  dollar_min: null,
+                                },
+                              ])
+                              .sort((a, b) => a.name.localeCompare(b.name))
+                              .findIndex((x) => x.id === v.id);
+                            if (idx >= 0) setSelectedIndex(idx);
+                          }
+                          setCreateOpen(false);
+                          setNewVendorName("");
+                          onCloseAddVendor?.();
+                        })();
+                      }
+                    }}
                   />
                 </div>
                 <div className="mt-6 flex justify-end gap-3">
@@ -601,19 +705,49 @@ export default function OrderingVendors({
           <div className="flex items-center justify-between gap-3 px-6 py-4 border-b border-gray-100">
             <div className="min-w-0 flex items-center gap-2">
               {editingName && selectedVendor ? (
-                <input
-                  className="w-full max-w-xs rounded-md bg-gray-50 border border-transparent px-2 py-1 text-sm focus:border-[var(--oe-green)]/40 focus:ring-2 focus:ring-[var(--oe-green)]/30 outline-none"
-                  value={vendorForm.name}
-                  onChange={(e) => {
-                    setVendorForm((prev) => ({
-                      ...prev,
-                      name: e.target.value,
-                    }));
-                    setVendorDirty(true);
-                  }}
-                  placeholder="Vendor name"
-                  autoFocus
-                />
+                <>
+                  <input
+                    className="w-64 sm:w-80 md:w-96 rounded-md bg-gray-50 border border-transparent px-3 py-2 text-sm focus:border-[var(--oe-green)]/40 focus:ring-2 focus:ring-[var(--oe-green)]/30 outline-none"
+                    value={vendorForm.name}
+                    onChange={(e) => {
+                      setVendorForm((prev) => ({
+                        ...prev,
+                        name: e.target.value,
+                      }));
+                      setVendorDirty(true);
+                    }}
+                    placeholder="Vendor name"
+                    autoFocus
+                  />
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setVendorForm((prev) => ({
+                        ...prev,
+                        name: selectedVendor?.name || "",
+                      }));
+                      setEditingName(false);
+                    }}
+                    aria-label="Cancel edit"
+                    className="shrink-0 rounded-md bg-red-50 hover:bg-red-100 text-red-600"
+                    style={{
+                      height: 36,
+                      width: 36,
+                      display: "grid",
+                      placeItems: "center",
+                    }}
+                  >
+                    <svg
+                      className="h-4 w-4"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2"
+                    >
+                      <path d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                  </button>
+                </>
               ) : (
                 <h3 className="text-lg font-semibold text-[var(--oe-black)] truncate">
                   {selectedVendor?.name || "No vendor selected"}
@@ -649,14 +783,34 @@ export default function OrderingVendors({
                 type="button"
                 onClick={saveVendorUpdates}
                 disabled={saving || !selectedVendor || !vendorDirty}
-                className={`rounded-md px-3 py-2 text-sm font-medium ${
+                className={`rounded-md px-3 py-2 text-sm  ${
                   saving || !selectedVendor || !vendorDirty
                     ? "bg-gray-300 text-gray-700 cursor-not-allowed"
                     : "bg-[var(--oe-green)] text-black hover:opacity-90"
                 }`}
               >
-                {saving ? "Saving…" : "SAVE"}
+                {saving ? "Saving…" : "Save"}
               </button>
+              {selectedVendor && (
+                <button
+                  type="button"
+                  onClick={() => setVendorConfirmOpen(true)}
+                  className="inline-flex items-center gap-2 rounded-md bg-red-50 hover:bg-red-100 text-red-600 px-3 py-2 text-sm"
+                >
+                  <svg
+                    className="h-5.5 w-4"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                  >
+                    <path d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                  <span className="hidden sm:inline">
+                    {deletingVendor ? "Deleting…" : "Delete Vendor"}
+                  </span>
+                </button>
+              )}
             </div>
           </div>
 
@@ -968,6 +1122,16 @@ export default function OrderingVendors({
                 setConfirmOpen(false);
                 setRepToDelete(null);
               }}
+            />
+
+            <ConfirmModal
+              isOpen={vendorConfirmOpen}
+              title="Delete vendor?"
+              message={<span>This will remove the vendor and its reps.</span>}
+              confirmLabel="Delete"
+              cancelLabel="Cancel"
+              onConfirm={confirmDeleteVendor}
+              onClose={() => setVendorConfirmOpen(false)}
             />
           </div>
         </div>

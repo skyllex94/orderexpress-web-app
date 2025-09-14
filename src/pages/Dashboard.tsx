@@ -882,7 +882,7 @@ export default function Dashboard() {
                     <path d="M12 5v14" />
                     <path d="M5 12h14" />
                   </svg>
-                  <span>Add a Vendor</span>
+                  <span className="hidden sm:inline">Add a Vendor</span>
                 </button>
               </div>
             ) : null
