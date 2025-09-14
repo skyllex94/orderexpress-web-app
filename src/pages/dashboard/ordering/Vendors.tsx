@@ -15,7 +15,13 @@ type Vendor = {
   dollar_min: number | null;
 };
 
-export default function OrderingVendors() {
+export default function OrderingVendors({
+  addVendorOpen = false,
+  onCloseAddVendor,
+}: {
+  addVendorOpen?: boolean;
+  onCloseAddVendor?: () => void;
+}) {
   const [vendors, setVendors] = useState<Vendor[] | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
@@ -317,8 +323,12 @@ export default function OrderingVendors() {
   const [repErrors, setRepErrors] = useState<
     Record<string, { name?: string; email?: string }>
   >({});
+  const [createOpen, setCreateOpen] = useState<boolean>(false);
+  const [creating, setCreating] = useState<boolean>(false);
+  const [newVendorName, setNewVendorName] = useState<string>("");
 
   useEffect(() => {
+    if (addVendorOpen) setCreateOpen(true);
     let mounted = true;
     async function loadReps() {
       if (!selectedVendor?.id) {
@@ -360,7 +370,7 @@ export default function OrderingVendors() {
     return () => {
       mounted = false;
     };
-  }, [selectedVendor?.id]);
+  }, [selectedVendor?.id, addVendorOpen]);
 
   function updateRep<K extends keyof RepForm>(
     id: string,
@@ -470,6 +480,123 @@ export default function OrderingVendors() {
       {/* Right: Vendor form (3/4 width) */}
       <section className="col-span-12 md:col-span-9">
         <div className="rounded-2xl bg-white shadow-sm ring-1 ring-gray-200">
+          {/* Create Vendor Modal */}
+          {createOpen && (
+            <div className="fixed inset-0 z-50 flex items-center justify-center">
+              <div
+                className="absolute inset-0 bg-black/50"
+                onClick={() => {
+                  setCreateOpen(false);
+                  setNewVendorName("");
+                  onCloseAddVendor?.();
+                }}
+              />
+              <div className="relative z-10 w-full max-w-md rounded-2xl bg-white p-6 text-[var(--oe-black)]">
+                <h3 className="text-lg font-semibold">Add a Vendor</h3>
+                <div className="mt-4">
+                  <label className="block text-xs font-medium text-gray-600">
+                    Vendor name
+                  </label>
+                  <input
+                    className="mt-1 w-full rounded-md bg-gray-50 border border-transparent px-3 py-2 text-sm focus:border-[var(--oe-green)]/40 focus:ring-2 focus:ring-[var(--oe-green)]/30 outline-none"
+                    placeholder="e.g., Ruby Wines"
+                    value={newVendorName}
+                    onChange={(e) => setNewVendorName(e.target.value)}
+                  />
+                </div>
+                <div className="mt-6 flex justify-end gap-3">
+                  <button
+                    onClick={() => {
+                      setCreateOpen(false);
+                      setNewVendorName("");
+                      onCloseAddVendor?.();
+                    }}
+                    className="rounded-md px-4 py-2 text-sm bg-black/5 hover:bg-black/10"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    disabled={!newVendorName.trim() || creating}
+                    onClick={async () => {
+                      if (!newVendorName.trim()) return;
+                      await supabase.auth.getSession();
+                      let businessId: string | null = null;
+                      try {
+                        businessId = localStorage.getItem(
+                          "oe_current_business_id"
+                        );
+                      } catch {
+                        /* ignore */
+                      }
+                      if (!businessId) return;
+                      setCreating(true);
+                      const { data, error } = await supabase
+                        .from("vendors")
+                        .insert({
+                          business_id: businessId,
+                          name: newVendorName.trim(),
+                        })
+                        .select();
+                      setCreating(false);
+                      if (!error && data && data[0]) {
+                        const v = data[0] as { id: string; name: string };
+                        setVendors((prev) => {
+                          const list = [
+                            ...(prev || []),
+                            {
+                              id: v.id,
+                              business_id: businessId!,
+                              name: v.name,
+                              notes: null,
+                              account_number: null,
+                              office_phone: null,
+                              website: null,
+                              delivery_days: null,
+                              case_min: null,
+                              dollar_min: null,
+                            },
+                          ];
+                          return list.sort((a, b) =>
+                            a.name.localeCompare(b.name)
+                          );
+                        });
+                        // Select the new vendor
+                        setSelectedIndex(0);
+                        const idx = (vendors || [])
+                          .concat([
+                            {
+                              id: v.id,
+                              business_id: businessId!,
+                              name: v.name,
+                              notes: null,
+                              account_number: null,
+                              office_phone: null,
+                              website: null,
+                              delivery_days: null,
+                              case_min: null,
+                              dollar_min: null,
+                            },
+                          ])
+                          .sort((a, b) => a.name.localeCompare(b.name))
+                          .findIndex((x) => x.id === v.id);
+                        if (idx >= 0) setSelectedIndex(idx);
+                      }
+                      setCreateOpen(false);
+                      setNewVendorName("");
+                      onCloseAddVendor?.();
+                    }}
+                    className={`rounded-md px-4 py-2 text-sm ${
+                      !newVendorName.trim() || creating
+                        ? "bg-gray-300 text-gray-700 cursor-not-allowed"
+                        : "bg-[var(--oe-green)] text-black hover:opacity-90"
+                    }`}
+                  >
+                    {creating ? "Adding…" : "Add Vendor"}
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
           {/* Header */}
           <div className="flex items-center justify-between gap-3 px-6 py-4 border-b border-gray-100">
             <div className="min-w-0 flex items-center gap-2">
