@@ -180,23 +180,47 @@ export default function OrderingVendors({
   const [vendorDirty, setVendorDirty] = useState<boolean>(false);
   const [justSaved, setJustSaved] = useState<boolean>(false);
   const [editingName, setEditingName] = useState<boolean>(false);
+  const [vendorNameError, setVendorNameError] = useState<string | null>(null);
+  const [saveBlockedMsg, setSaveBlockedMsg] = useState<string | null>(null);
   const [vendorConfirmOpen, setVendorConfirmOpen] = useState<boolean>(false);
   const [deletingVendor, setDeletingVendor] = useState<boolean>(false);
   async function saveVendorUpdates() {
     if (!selectedVendor?.id) return;
     setSaving(true);
+    // Validate vendor name
+    if (!vendorForm.name.trim()) {
+      setVendorNameError("Vendor name is required");
+      setSaveBlockedMsg("Could not save. Please fix the highlighted errors.");
+      setSaving(false);
+      return;
+    } else {
+      setVendorNameError(null);
+    }
     // Validate newly added reps (require name and email)
-    const nextErrors: Record<string, { name?: string; email?: string }> = {};
+    const nextErrors: Record<
+      string,
+      { name?: string; email?: string; phone?: string }
+    > = {};
     const newReps = reps.filter((r) => r.id.startsWith("tmp_"));
     newReps.forEach((r) => {
-      const errs: { name?: string; email?: string } = {};
+      const errs: { name?: string; email?: string; phone?: string } = {};
       if (!r.name?.trim()) errs.name = "Rep name is required";
       if (!/.+@.+\..+/.test(r.email || ""))
         errs.email = "Valid email is required";
       if (errs.name || errs.email) nextErrors[r.id] = errs;
     });
+    // Validate phone presence when send by text is enabled
+    reps.forEach((r) => {
+      if (r.sendText && !r.phone.trim()) {
+        nextErrors[r.id] = {
+          ...(nextErrors[r.id] || {}),
+          phone: "Phone is required when sending by text",
+        };
+      }
+    });
     if (Object.keys(nextErrors).length > 0) {
       setRepErrors(nextErrors);
+      setSaveBlockedMsg("Could not save. Please fix the highlighted errors.");
       setSaving(false);
       return;
     }
@@ -252,6 +276,8 @@ export default function OrderingVendors({
               name: r.name?.trim() || "",
               email: r.email?.trim() || null,
               phone: r.phone?.trim() || null,
+              send_by_email: !!r.sendEmail,
+              send_by_text: !!r.sendText,
             }))
           )
           .select();
@@ -276,6 +302,8 @@ export default function OrderingVendors({
                 name: r.name?.trim() || "",
                 email: r.email?.trim() || null,
                 phone: r.phone?.trim() || null,
+                send_by_email: !!r.sendEmail,
+                send_by_text: !!r.sendText,
               })
               .eq("id", r.id)
           )
@@ -292,6 +320,9 @@ export default function OrderingVendors({
       // Mark as saved and disable the Save button again
       setVendorDirty(false);
       setJustSaved(true);
+      // Clear any lingering rep field errors after a successful save
+      setRepErrors({});
+      setSaveBlockedMsg(null);
       setTimeout(() => setJustSaved(false), 2500);
     }
     setSaving(false);
@@ -338,7 +369,7 @@ export default function OrderingVendors({
     name: "",
     email: "",
     phone: "",
-    sendEmail: false,
+    sendEmail: true,
     attachCsv: false,
     sendText: false,
   });
@@ -349,7 +380,7 @@ export default function OrderingVendors({
   const [confirmOpen, setConfirmOpen] = useState<boolean>(false);
   const [repToDelete, setRepToDelete] = useState<string | null>(null);
   const [repErrors, setRepErrors] = useState<
-    Record<string, { name?: string; email?: string }>
+    Record<string, { name?: string; email?: string; phone?: string }>
   >({});
   const [createOpen, setCreateOpen] = useState<boolean>(false);
   const [creating, setCreating] = useState<boolean>(false);
@@ -369,7 +400,7 @@ export default function OrderingVendors({
       setRepsLoading(true);
       const { data, error: err } = await supabase
         .from("vendors_reps")
-        .select("id, name, email, phone")
+        .select("id, name, email, phone, send_by_email, send_by_text")
         .eq("vendor_id", selectedVendor.id)
         .order("name", { ascending: true });
       if (!mounted) return;
@@ -377,22 +408,23 @@ export default function OrderingVendors({
         // On error, just show empty and allow adding manually
         setReps([]);
       } else {
-        const mapped: RepForm[] = (data || []).map(
-          (r: {
-            id: string;
-            name: string;
-            email: string | null;
-            phone: string | null;
-          }) => ({
-            id: r.id,
-            name: r.name || "",
-            email: r.email || "",
-            phone: r.phone || "",
-            sendEmail: false,
-            attachCsv: false,
-            sendText: false,
-          })
-        );
+        type RepRow = {
+          id: string;
+          name: string | null;
+          email: string | null;
+          phone: string | null;
+          send_by_email: boolean | null;
+          send_by_text: boolean | null;
+        };
+        const mapped: RepForm[] = ((data as RepRow[]) || []).map((r) => ({
+          id: r.id,
+          name: r.name || "",
+          email: r.email || "",
+          phone: r.phone || "",
+          sendEmail: r.send_by_email ?? true,
+          attachCsv: false,
+          sendText: r.send_by_text ?? false,
+        }));
         setReps(mapped);
       }
       setRepsLoading(false);
@@ -413,12 +445,18 @@ export default function OrderingVendors({
     );
     setVendorDirty(true);
 
-    if (key === "name" || key === "email") {
+    if (
+      key === "name" ||
+      key === "email" ||
+      key === "phone" ||
+      key === "sendText"
+    ) {
       setRepErrors((prev) => {
         const next = { ...prev };
         const curr = { ...(next[id] || {}) } as {
           name?: string;
           email?: string;
+          phone?: string;
         };
         if (key === "name") {
           const val = String(value || "");
@@ -431,13 +469,26 @@ export default function OrderingVendors({
           if (ok) delete curr.email;
           else curr.email = "Valid email is required";
         }
-        if (!curr.name && !curr.email) {
+        if (key === "phone" || key === "sendText") {
+          const rep = reps.find((r) => r.id === id);
+          const sendText =
+            key === "sendText" ? Boolean(value) : Boolean(rep?.sendText);
+          const phone =
+            key === "phone" ? String(value || "") : String(rep?.phone || "");
+          if (sendText && !phone.trim()) {
+            curr.phone = "Phone is required when sending by text";
+          } else {
+            delete curr.phone;
+          }
+        }
+        if (!curr.name && !curr.email && !curr.phone) {
           delete next[id];
         } else {
           next[id] = curr;
         }
         return next;
       });
+      if (saveBlockedMsg) setSaveBlockedMsg(null);
     }
   }
 
@@ -715,10 +766,16 @@ export default function OrderingVendors({
                         name: e.target.value,
                       }));
                       setVendorDirty(true);
+                      if (saveBlockedMsg) setSaveBlockedMsg(null);
                     }}
                     placeholder="Vendor name"
                     autoFocus
                   />
+                  {vendorNameError && (
+                    <span className="ml-1 text-xs text-red-600">
+                      {vendorNameError}
+                    </span>
+                  )}
                   <button
                     type="button"
                     onClick={() => {
@@ -816,6 +873,11 @@ export default function OrderingVendors({
 
           {/* Body */}
           <div className="p-6 space-y-8">
+            {saveBlockedMsg && (
+              <div className="rounded-md bg-red-50 text-red-700 ring-1 ring-red-200 px-3 py-2 text-sm">
+                {saveBlockedMsg}
+              </div>
+            )}
             {/* Top: Two columns - Left details, Right address */}
             <div className="grid grid-cols-12 gap-6">
               {/* Left column */}
@@ -1017,12 +1079,14 @@ export default function OrderingVendors({
                           </label>
                           <input
                             type="email"
-                            className="mt-1 w-full rounded-lg bg-gray-50 border border-transparent px-3 py-2 text-sm focus:border-[var(--oe-green)]/40 focus:ring-2 focus:ring-[var(--oe-green)]/30 outline-none"
+                            className="mt-1 w-full rounded-lg bg-gray-50 border border-transparent px-3 py-2 text-sm focus:border-[var(--oe-green)]/40 focus:ring-2 focus:ring-[var(--oe-green)]/30 outline-none disabled:opacity-50"
                             placeholder="name@example.com"
                             value={rep.email}
                             onChange={(e) =>
                               updateRep(rep.id, "email", e.target.value)
                             }
+                            readOnly={!rep.sendEmail}
+                            disabled={!rep.sendEmail}
                           />
                           {repErrors[rep.id]?.email && (
                             <div className="mt-1 text-xs text-red-600">
@@ -1035,13 +1099,20 @@ export default function OrderingVendors({
                             Cell Phone
                           </label>
                           <input
-                            className="mt-1 w-full rounded-lg bg-gray-50 border border-transparent px-3 py-2 text-sm focus:border-[var(--oe-green)]/40 focus:ring-2 focus:ring-[var(--oe-green)]/30 outline-none"
+                            className="mt-1 w-full rounded-lg bg-gray-50 border border-transparent px-3 py-2 text-sm focus:border-[var(--oe-green)]/40 focus:ring-2 focus:ring-[var(--oe-green)]/30 outline-none disabled:opacity-50"
                             placeholder=""
                             value={rep.phone}
                             onChange={(e) =>
                               updateRep(rep.id, "phone", e.target.value)
                             }
+                            readOnly={!rep.sendText}
+                            disabled={!rep.sendText}
                           />
+                          {repErrors[rep.id]?.phone && (
+                            <div className="mt-1 text-xs text-red-600">
+                              {repErrors[rep.id]?.phone}
+                            </div>
+                          )}
                         </div>
                       </div>
 
@@ -1055,7 +1126,7 @@ export default function OrderingVendors({
                               updateRep(rep.id, "sendEmail", e.target.checked)
                             }
                           />
-                          <span>Send orders via email</span>
+                          <span>Send orders by email</span>
                         </label>
                         <label className="inline-flex items-center gap-2 text-sm text-gray-700">
                           <input
@@ -1066,7 +1137,7 @@ export default function OrderingVendors({
                               updateRep(rep.id, "sendText", e.target.checked)
                             }
                           />
-                          <span>Send orders via text</span>
+                          <span>Send orders by text</span>
                         </label>
 
                         {reps.length > 1 && (
