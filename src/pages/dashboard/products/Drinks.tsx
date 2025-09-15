@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
+import { supabase } from "../../../services/supabase";
 
 type UIProductRow = {
   id: string;
@@ -10,34 +11,9 @@ type UIProductRow = {
 };
 
 export default function ProductsDrinks() {
-  const [loading] = useState<boolean>(false);
-  // Placeholder data for UI only
-  const [products] = useState<UIProductRow[]>([
-    {
-      id: "p1",
-      name: "Reposado Tequila",
-      category: "Spirits / Tequila",
-      vendor: "Agave Imports",
-      measuringUnit: "750 mL bottle",
-      cost: "$28.00",
-    },
-    {
-      id: "p2",
-      name: "Craft IPA",
-      category: "Beer / IPA",
-      vendor: "Hop Valley",
-      measuringUnit: "12 fl.oz can",
-      cost: "$1.85",
-    },
-    {
-      id: "p3",
-      name: "House Cabernet",
-      category: "Wine / Red",
-      vendor: "Vintner Co.",
-      measuringUnit: "750 mL bottle",
-      cost: "$12.40",
-    },
-  ]);
+  const [loading, setLoading] = useState<boolean>(true);
+  const [error, setError] = useState<string | null>(null);
+  const [products, setProducts] = useState<UIProductRow[]>([]);
 
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const headerCheckboxRef = useRef<HTMLInputElement>(null);
@@ -54,6 +30,45 @@ export default function ProductsDrinks() {
   }, [someSelected, selectedCount]);
 
   const rows = useMemo(() => products, [products]);
+
+  useEffect(() => {
+    let mounted = true;
+    async function load() {
+      setLoading(true);
+      setError(null);
+      try {
+        // Fetch from drink_products; adapt to display columns
+        const { data, error: err } = await supabase
+          .from("drink_products")
+          .select("id, name, category, vendor")
+          .order("created_at", { ascending: false });
+        if (err) throw err;
+        if (!mounted) return;
+        const mapped: UIProductRow[] = (data || []).map((r) => ({
+          id: r.id as string,
+          name: (r.name as string) || "Untitled",
+          category: (r.category as string) || "-",
+          vendor: (r.vendor as string) || "-",
+          measuringUnit: "-",
+          cost: "-",
+        }));
+        setProducts(mapped);
+      } catch (e: unknown) {
+        const message =
+          typeof e === "object" && e !== null && "message" in e
+            ? String((e as { message?: unknown }).message)
+            : "Failed to load products";
+        if (!mounted) return;
+        setError(message);
+      } finally {
+        if (mounted) setLoading(false);
+      }
+    }
+    load();
+    return () => {
+      mounted = false;
+    };
+  }, []);
 
   function toggleRow(id: string) {
     setSelectedIds((prev) => {
@@ -125,10 +140,17 @@ export default function ProductsDrinks() {
                   </td>
                 </tr>
               )}
-              {!loading && rows.length === 0 && (
+              {!loading && !error && rows.length === 0 && (
                 <tr>
                   <td colSpan={6} className="px-6 py-10 text-sm text-gray-500">
                     No products yet.
+                  </td>
+                </tr>
+              )}
+              {!loading && error && (
+                <tr>
+                  <td colSpan={6} className="px-6 py-10 text-sm text-red-600">
+                    {error}
                   </td>
                 </tr>
               )}

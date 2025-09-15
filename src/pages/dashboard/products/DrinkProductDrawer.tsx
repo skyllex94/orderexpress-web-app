@@ -54,6 +54,8 @@ export default function DrinkProductDrawer({
     "other",
   ];
   const [vendor, setVendor] = useState("");
+  const [vendorsLoading, setVendorsLoading] = useState<boolean>(false);
+  const [vendorOptions, setVendorOptions] = useState<string[]>([]);
   const [price, setPrice] = useState("");
   const [reportingCost, setReportingCost] = useState("");
   const [reportingUnit, setReportingUnit] = useState("");
@@ -103,6 +105,33 @@ export default function DrinkProductDrawer({
       ]);
     }
   }, [open]);
+
+  useEffect(() => {
+    let mounted = true;
+    async function loadVendors() {
+      if (!open || !businessId) return;
+      setVendorsLoading(true);
+      try {
+        const { data, error } = await supabase
+          .from("vendors")
+          .select("name")
+          .eq("business_id", businessId)
+          .order("name", { ascending: true });
+        if (error) return;
+        if (!mounted) return;
+        const names = (data || [])
+          .map((v) => String(v.name || ""))
+          .filter((n) => n.trim().length > 0);
+        setVendorOptions(names);
+      } finally {
+        if (mounted) setVendorsLoading(false);
+      }
+    }
+    loadVendors();
+    return () => {
+      mounted = false;
+    };
+  }, [open, businessId]);
 
   return (
     <>
@@ -389,12 +418,19 @@ export default function DrinkProductDrawer({
               <label className="block text-xs font-medium text-gray-700">
                 Vendor
               </label>
-              <input
-                className="mt-1 w-full rounded-lg bg-gray-50 border border-transparent px-3 py-2 text-sm focus:border-[var(--oe-green)]/40 focus:ring-2 focus:ring-[var(--oe-green)]/30 outline-none"
-                placeholder="e.g., Agave Imports"
+              <select
+                className="mt-1 w-full rounded-lg bg-gray-50 border border-transparent px-2 py-2 text-sm text-[var(--oe-black)] focus:border-[var(--oe-green)]/40 focus:ring-2 focus:ring-[var(--oe-green)]/30 outline-none"
                 value={vendor}
                 onChange={(e) => setVendor(e.target.value)}
-              />
+                disabled={vendorsLoading}
+              >
+                <option value="">Select a vendor…</option>
+                {vendorOptions.map((name) => (
+                  <option key={name} value={name}>
+                    {name}
+                  </option>
+                ))}
+              </select>
             </div>
           </div>
 
