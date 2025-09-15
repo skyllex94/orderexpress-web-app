@@ -1463,6 +1463,7 @@ export default function Dashboard() {
           drinkDrawerOpen
         }
         onClose={() => setDrinkDrawerOpen(false)}
+        businessId={businessId}
       />
       <ConfirmModal
         isOpen={switchConfirmOpen}
