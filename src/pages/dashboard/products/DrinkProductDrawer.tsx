@@ -18,6 +18,8 @@ export default function DrinkProductDrawer({
   const [sku, setSku] = useState("");
   const [category, setCategory] = useState("");
   const [subcategory, setSubcategory] = useState("");
+  const [categoryId, setCategoryId] = useState<string>("");
+  const [subcategoryId, setSubcategoryId] = useState<string>("");
   // Packaging form state
   type PackagingForm = {
     id: string;
@@ -56,6 +58,15 @@ export default function DrinkProductDrawer({
   const [vendor, setVendor] = useState("");
   const [vendorsLoading, setVendorsLoading] = useState<boolean>(false);
   const [vendorOptions, setVendorOptions] = useState<string[]>([]);
+  const [categoriesLoading, setCategoriesLoading] = useState<boolean>(false);
+  const [subcategoriesLoading, setSubcategoriesLoading] =
+    useState<boolean>(false);
+  const [categoryOptions, setCategoryOptions] = useState<
+    { id: string; name: string }[]
+  >([]);
+  const [subcategoryOptions, setSubcategoryOptions] = useState<
+    { id: string; name: string }[]
+  >([]);
   const [price, setPrice] = useState("");
   const [reportingCost, setReportingCost] = useState("");
   const [reportingUnit, setReportingUnit] = useState("");
@@ -89,6 +100,8 @@ export default function DrinkProductDrawer({
       setSku("");
       setCategory("");
       setSubcategory("");
+      setCategoryId("");
+      setSubcategoryId("");
       setVendor("");
       setPrice("");
       setReportingCost("");
@@ -128,6 +141,58 @@ export default function DrinkProductDrawer({
       }
     }
     loadVendors();
+    return () => {
+      mounted = false;
+    };
+  }, [open, businessId]);
+
+  // Load categories and subcategories on open
+  useEffect(() => {
+    let mounted = true;
+    async function loadCategories() {
+      if (!open || !businessId) return;
+      setCategoriesLoading(true);
+      try {
+        const { data, error } = await supabase
+          .from("drink_categories")
+          .select("id, name")
+          .eq("business_id", businessId)
+          .order("name", { ascending: true });
+        if (error) return;
+        if (!mounted) return;
+        setCategoryOptions(
+          (data || []).map((r) => ({
+            id: String(r.id),
+            name: String(r.name || ""),
+          }))
+        );
+      } finally {
+        if (mounted) setCategoriesLoading(false);
+      }
+    }
+    async function loadSubcategories() {
+      if (!open || !businessId) return;
+      setSubcategoriesLoading(true);
+      try {
+        const { data, error } = await supabase
+          .from("drink_subcategories")
+          .select("id, name")
+          .eq("business_id", businessId)
+          .order("name", { ascending: true });
+        if (error) return;
+        if (!mounted) return;
+        setSubcategoryOptions(
+          (data || []).map((r) => ({
+            id: String(r.id),
+            name: String(r.name || ""),
+          }))
+        );
+      } finally {
+        if (mounted) setSubcategoriesLoading(false);
+      }
+    }
+    loadCategories();
+    loadSubcategories();
     return () => {
       mounted = false;
     };
@@ -210,12 +275,57 @@ export default function DrinkProductDrawer({
                 <label className="block text-xs font-medium text-gray-700">
                   Category
                 </label>
-                <input
-                  className="mt-1 w-full rounded-lg bg-gray-50 border border-transparent px-3 py-2 text-sm focus:border-[var(--oe-green)]/40 focus:ring-2 focus:ring-[var(--oe-green)]/30 outline-none"
-                  placeholder="e.g., Spirits"
-                  value={category}
-                  onChange={(e) => setCategory(e.target.value)}
-                />
+                <select
+                  className="mt-1 w-full rounded-lg bg-gray-50 border border-transparent px-2 py-2 text-sm text-[var(--oe-black)] focus:border-[var(--oe-green)]/40 focus:ring-2 focus:ring-[var(--oe-green)]/30 outline-none"
+                  value={categoryId}
+                  onChange={(e) => {
+                    const id = e.target.value;
+                    if (id === "__new_category__") {
+                      const name = window.prompt("New category name");
+                      const newName = (name || "").trim();
+                      if (!newName || !businessId) return;
+                      (async () => {
+                        setCategoriesLoading(true);
+                        try {
+                          const { data, error } = await supabase
+                            .from("drink_categories")
+                            .insert({ business_id: businessId, name: newName })
+                            .select("id, name")
+                            .single();
+                          if (!error && data) {
+                            const inserted = {
+                              id: String(data.id),
+                              name: String(data.name || newName),
+                            };
+                            setCategoryOptions((prev) => {
+                              const next = [...prev, inserted].sort((a, b) =>
+                                a.name.localeCompare(b.name)
+                              );
+                              return next;
+                            });
+                            setCategoryId(inserted.id);
+                            setCategory(inserted.name);
+                          }
+                        } finally {
+                          setCategoriesLoading(false);
+                        }
+                      })();
+                      return;
+                    }
+                    setCategoryId(id);
+                    const found = categoryOptions.find((c) => c.id === id);
+                    setCategory(found?.name || "");
+                  }}
+                  disabled={categoriesLoading}
+                >
+                  <option value="">Select a category…</option>
+                  {categoryOptions.map((c) => (
+                    <option key={c.id} value={c.id}>
+                      {c.name}
+                    </option>
+                  ))}
+                  <option value="__new_category__">+ Add new category…</option>
+                </select>
               </div>
             </div>
             <div className="col-span-6">
@@ -233,12 +343,24 @@ export default function DrinkProductDrawer({
                 <label className="block text-xs font-medium text-gray-700">
                   Subcategory
                 </label>
-                <input
-                  className="mt-1 w-full rounded-lg bg-gray-50 border border-transparent px-3 py-2 text-sm focus:border-[var(--oe-green)]/40 focus:ring-2 focus:ring-[var(--oe-green)]/30 outline-none"
-                  placeholder="e.g., Tequila"
-                  value={subcategory}
-                  onChange={(e) => setSubcategory(e.target.value)}
-                />
+                <select
+                  className="mt-1 w-full rounded-lg bg-gray-50 border border-transparent px-2 py-2 text-sm text-[var(--oe-black)] focus:border-[var(--oe-green)]/40 focus:ring-2 focus:ring-[var(--oe-green)]/30 outline-none"
+                  value={subcategoryId}
+                  onChange={(e) => {
+                    const id = e.target.value;
+                    setSubcategoryId(id);
+                    const found = subcategoryOptions.find((s) => s.id === id);
+                    setSubcategory(found?.name || "");
+                  }}
+                  disabled={subcategoriesLoading}
+                >
+                  <option value="">Select a subcategory…</option>
+                  {subcategoryOptions.map((s) => (
+                    <option key={s.id} value={s.id}>
+                      {s.name}
+                    </option>
+                  ))}
+                </select>
               </div>
             </div>
           </div>
@@ -510,6 +632,8 @@ export default function DrinkProductDrawer({
                   brand_name: null as string | null,
                   category: category.trim() || null,
                   subcategory: subcategory.trim() || null,
+                  category_id: categoryId || null,
+                  subcategory_id: subcategoryId || null,
                   vendor: vendor.trim() || null,
                   sku: sku.trim() || null,
                   notes: notes.trim() || null,
