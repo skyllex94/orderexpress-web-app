@@ -810,7 +810,7 @@ export default function Dashboard() {
           extra={
             active === "products" && productsSection === "drink" ? (
               <div className="flex items-center gap-3 sm:gap-4">
-                <div className="w-48 sm:w-64 md:w-80">
+                <div className="w-72 sm:w-72 md:w-80">
                   <div className="relative">
                     <svg
                       className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400"
@@ -845,12 +845,12 @@ export default function Dashboard() {
                     <path d="M12 5v14" />
                     <path d="M5 12h14" />
                   </svg>
-                  <span>Add Product</span>
+                  <span className="hidden sm:inline">Add Product</span>
                 </button>
               </div>
             ) : active === "ordering" && orderingSection === "vendors" ? (
               <div className="flex items-center gap-3 sm:gap-4">
-                <div className="w-48 sm:w-64 md:w-80">
+                <div className="w-full sm:w-64 md:w-80">
                   <div className="relative">
                     <svg
                       className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400"

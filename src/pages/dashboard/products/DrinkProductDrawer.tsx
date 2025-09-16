@@ -90,6 +90,13 @@ export default function DrinkProductDrawer({
   const [pkgToDelete, setPkgToDelete] = useState<string | null>(null);
   const [manageCategoriesOpen, setManageCategoriesOpen] =
     useState<boolean>(false);
+  const isPackagingComplete = (p: PackagingForm) =>
+    p.caseSize.trim().length > 0 &&
+    p.unitSize.trim().length > 0 &&
+    p.measureType.trim().length > 0 &&
+    p.unitType.trim().length > 0;
+  const allPackagingComplete =
+    packaging.length > 0 && packaging.every(isPackagingComplete);
 
   useEffect(() => {
     function onEsc(e: KeyboardEvent) {
@@ -595,11 +602,13 @@ export default function DrinkProductDrawer({
           <button
             type="button"
             className={`inline-flex items-center gap-2 rounded-md px-3 py-2 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-[var(--oe-green)]/60 ${
-              saving || !name.trim() || !businessId
+              saving || !name.trim() || !businessId || !allPackagingComplete
                 ? "bg-gray-300 text-gray-700 cursor-not-allowed"
                 : "bg-[var(--oe-green)] text-black hover:opacity-90"
             }`}
-            disabled={saving || !name.trim() || !businessId}
+            disabled={
+              saving || !name.trim() || !businessId || !allPackagingComplete
+            }
             onClick={async () => {
               if (!name.trim()) {
                 setSaveError("Product name is required");
@@ -609,9 +618,20 @@ export default function DrinkProductDrawer({
                 setSaveError("Missing business context.");
                 return;
               }
+              if (!allPackagingComplete) {
+                setSaveError("Please complete all packaging fields.");
+                return;
+              }
               setSaveError(null);
               setSaving(true);
               try {
+                const priceValueRaw = price.trim();
+                const priceParsed = priceValueRaw
+                  ? Number.parseFloat(priceValueRaw.replace(/[^0-9.]/g, ""))
+                  : NaN;
+                const priceValue = Number.isFinite(priceParsed)
+                  ? priceParsed
+                  : null;
                 const row = {
                   business_id: businessId,
                   name: name.trim(),
@@ -622,14 +642,38 @@ export default function DrinkProductDrawer({
                   subcategory_id: subcategoryId || null,
                   vendor: vendor.trim() || null,
                   sku: sku.trim() || null,
+                  price: priceValue as number | null,
                   notes: notes.trim() || null,
                 };
-                const { error } = await supabase
+                const { data: inserted, error } = await supabase
                   .from("drink_products")
-                  .insert([row]);
+                  .insert([row])
+                  .select("id")
+                  .single();
                 if (error) {
                   setSaveError(error.message || "Failed to save product.");
-                } else {
+                } else if (inserted?.id) {
+                  const packagingRows = packaging
+                    .filter(isPackagingComplete)
+                    .map((p) => ({
+                      product_id: inserted.id,
+                      case_size: parseInt(p.caseSize, 10),
+                      unit_size: parseFloat(p.unitSize),
+                      measure_type: p.measureType,
+                      unit_type: p.unitType,
+                      notes: null as string | null,
+                    }));
+                  if (packagingRows.length > 0) {
+                    const { error: pkgError } = await supabase
+                      .from("drink_products_packaging")
+                      .insert(packagingRows);
+                    if (pkgError) {
+                      setSaveError(
+                        pkgError.message || "Failed to save packaging."
+                      );
+                      return;
+                    }
+                  }
                   onClose();
                 }
               } finally {

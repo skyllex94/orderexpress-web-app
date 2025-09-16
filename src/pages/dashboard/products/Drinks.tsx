@@ -115,7 +115,7 @@ export default function ProductsDrinks() {
           <table className="min-w-full table-auto">
             <thead>
               <tr className="bg-gray-50 border-y border-gray-100 text-left text-xs text-gray-600">
-                <th className="w-10 px-6 py-3">
+                <th className="w-10 px-3 sm:px-6 py-3">
                   <input
                     ref={headerCheckboxRef}
                     type="checkbox"
@@ -125,11 +125,21 @@ export default function ProductsDrinks() {
                     aria-label="Select all products"
                   />
                 </th>
-                <th className="px-3 py-3 font-medium">Product</th>
-                <th className="px-3 py-3 font-medium">Category</th>
-                <th className="px-3 py-3 font-medium">Vendor</th>
-                <th className="px-3 py-3 font-medium">Measuring Unit</th>
-                <th className="px-6 py-3 font-medium text-right">Cost</th>
+                <th className="px-2 sm:px-3 py-3 font-medium min-w-[120px]">
+                  Product
+                </th>
+                <th className="px-2 sm:px-3 py-3 font-medium min-w-[100px] hidden sm:table-cell">
+                  Category
+                </th>
+                <th className="px-2 sm:px-3 py-3 font-medium min-w-[100px] hidden md:table-cell">
+                  Vendor
+                </th>
+                <th className="px-2 sm:px-3 py-3 font-medium min-w-[120px] hidden lg:table-cell">
+                  Measuring Unit
+                </th>
+                <th className="px-3 sm:px-6 py-3 font-medium text-right min-w-[80px]">
+                  Cost
+                </th>
               </tr>
             </thead>
             <tbody>
@@ -163,7 +173,7 @@ export default function ProductsDrinks() {
                       key={p.id}
                       className="border-b border-gray-100 hover:bg-gray-50"
                     >
-                      <td className="px-6 py-3 align-middle">
+                      <td className="px-3 sm:px-6 py-3 align-middle">
                         <input
                           type="checkbox"
                           className="h-4 w-4 rounded border-gray-300"
@@ -172,25 +182,33 @@ export default function ProductsDrinks() {
                           aria-label={`Select ${p.name}`}
                         />
                       </td>
-                      <td className="px-3 py-3 align-middle">
+                      <td className="px-2 sm:px-3 py-3 align-middle">
                         <div className="text-sm font-medium text-[var(--oe-black)]">
                           {p.name}
                         </div>
+                        <div className="sm:hidden mt-1 grid grid-cols-2 gap-x-2 gap-y-1 text-xs text-gray-600">
+                          <div className="font-medium">Category:</div>
+                          <div>{p.category}</div>
+                          <div className="font-medium">Vendor:</div>
+                          <div>{p.vendor}</div>
+                          <div className="font-medium">Measuring Unit:</div>
+                          <div>{p.measuringUnit}</div>
+                        </div>
                       </td>
-                      <td className="px-3 py-3 align-middle">
+                      <td className="px-2 sm:px-3 py-3 align-middle hidden sm:table-cell">
                         <div className="text-sm text-gray-700">
                           {p.category}
                         </div>
                       </td>
-                      <td className="px-3 py-3 align-middle">
+                      <td className="px-2 sm:px-3 py-3 align-middle hidden md:table-cell">
                         <div className="text-sm text-gray-700">{p.vendor}</div>
                       </td>
-                      <td className="px-3 py-3 align-middle">
+                      <td className="px-2 sm:px-3 py-3 align-middle hidden lg:table-cell">
                         <div className="text-sm text-gray-700">
                           {p.measuringUnit}
                         </div>
                       </td>
-                      <td className="px-6 py-3 align-middle text-right">
+                      <td className="px-3 sm:px-6 py-3 align-middle text-right">
                         <div className="text-sm text-gray-900">{p.cost}</div>
                       </td>
                     </tr>
