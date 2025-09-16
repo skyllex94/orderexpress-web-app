@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import ConfirmModal from "../../../components/ConfirmModal";
+import ManageDrinkCategoriesModal from "../../../components/modals/ManageDrinkCategoriesModal";
 import { supabase } from "../../../services/supabase";
 
 type DrinkProductDrawerProps = {
@@ -84,6 +85,8 @@ export default function DrinkProductDrawer({
   ]);
   const [pkgConfirmOpen, setPkgConfirmOpen] = useState<boolean>(false);
   const [pkgToDelete, setPkgToDelete] = useState<string | null>(null);
+  const [manageCategoriesOpen, setManageCategoriesOpen] =
+    useState<boolean>(false);
 
   useEffect(() => {
     function onEsc(e: KeyboardEvent) {
@@ -281,35 +284,7 @@ export default function DrinkProductDrawer({
                   onChange={(e) => {
                     const id = e.target.value;
                     if (id === "__new_category__") {
-                      const name = window.prompt("New category name");
-                      const newName = (name || "").trim();
-                      if (!newName || !businessId) return;
-                      (async () => {
-                        setCategoriesLoading(true);
-                        try {
-                          const { data, error } = await supabase
-                            .from("drink_categories")
-                            .insert({ business_id: businessId, name: newName })
-                            .select("id, name")
-                            .single();
-                          if (!error && data) {
-                            const inserted = {
-                              id: String(data.id),
-                              name: String(data.name || newName),
-                            };
-                            setCategoryOptions((prev) => {
-                              const next = [...prev, inserted].sort((a, b) =>
-                                a.name.localeCompare(b.name)
-                              );
-                              return next;
-                            });
-                            setCategoryId(inserted.id);
-                            setCategory(inserted.name);
-                          }
-                        } finally {
-                          setCategoriesLoading(false);
-                        }
-                      })();
+                      setManageCategoriesOpen(true);
                       return;
                     }
                     setCategoryId(id);
@@ -326,6 +301,7 @@ export default function DrinkProductDrawer({
                   ))}
                   <option value="__new_category__">+ Add new category…</option>
                 </select>
+                {/* Inline add removed; modal will be used instead */}
               </div>
             </div>
             <div className="col-span-6">
@@ -670,6 +646,44 @@ export default function DrinkProductDrawer({
           </button>
         </div>
       </div>
+      <ManageDrinkCategoriesModal
+        isOpen={manageCategoriesOpen}
+        onClose={() => setManageCategoriesOpen(false)}
+        businessId={businessId}
+        onAdded={(inserted) => {
+          setCategoryOptions((prev) => {
+            const next = [...prev, inserted].sort((a, b) =>
+              a.name.localeCompare(b.name)
+            );
+            return next;
+          });
+          setCategoryId(inserted.id);
+          setCategory(inserted.name);
+        }}
+        onDeleted={(deletedId) => {
+          setCategoryOptions((prev) => prev.filter((c) => c.id !== deletedId));
+          setCategoryId((currentId) => {
+            if (currentId === deletedId) {
+              setCategory("");
+              return "";
+            }
+            return currentId;
+          });
+        }}
+        onRenamed={(id, name) => {
+          setCategoryOptions((prev) => {
+            const next = prev.map((c) => (c.id === id ? { ...c, name } : c));
+            next.sort((a, b) => a.name.localeCompare(b.name));
+            return next;
+          });
+          setCategoryId((currentId) => {
+            if (currentId === id) {
+              setCategory(name);
+            }
+            return currentId;
+          });
+        }}
+      />
       <ConfirmModal
         isOpen={pkgConfirmOpen}
         title="Delete packaging?"

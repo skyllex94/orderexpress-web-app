@@ -1,0 +1,428 @@
+import { useEffect, useState } from "react";
+import { supabase } from "../../services/supabase";
+import ConfirmModal from "../ConfirmModal";
+
+type Category = { id: string; name: string };
+
+export default function ManageDrinkSubcategoriesModal({
+  isOpen,
+  onClose,
+  businessId,
+  onAdded,
+  onDeleted,
+  onRenamed,
+}: {
+  isOpen: boolean;
+  onClose: () => void;
+  businessId: string;
+  onAdded?: (c: Category) => void;
+  onDeleted?: (id: string) => void;
+  onRenamed?: (id: string, name: string) => void;
+}) {
+  const [loading, setLoading] = useState<boolean>(false);
+  const [error, setError] = useState<string | null>(null);
+  const [categories, setCategories] = useState<Category[]>([]);
+  const [newName, setNewName] = useState<string>("");
+  const [adding, setAdding] = useState<boolean>(false);
+  const [showAdd, setShowAdd] = useState<boolean>(false);
+  const [toDelete, setToDelete] = useState<Category | null>(null);
+  const [deleting, setDeleting] = useState<boolean>(false);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editName, setEditName] = useState<string>("");
+  const [renaming, setRenaming] = useState<boolean>(false);
+
+  useEffect(() => {
+    let mounted = true;
+    async function load() {
+      if (!isOpen || !businessId) return;
+      setLoading(true);
+      setError(null);
+      try {
+        const { data, error: err } = await supabase
+          .from("drink_categories")
+          .select("id, name")
+          .eq("business_id", businessId)
+          .order("name", { ascending: true });
+        if (err) throw err;
+        if (!mounted) return;
+        setCategories(
+          (data || []).map((r) => ({
+            id: String(r.id),
+            name: String(r.name || ""),
+          }))
+        );
+      } catch (e: unknown) {
+        const message =
+          typeof e === "object" && e !== null && "message" in e
+            ? String((e as { message?: unknown }).message)
+            : "Failed to load categories";
+        if (mounted) setError(message);
+      } finally {
+        if (mounted) setLoading(false);
+      }
+    }
+    load();
+    return () => {
+      mounted = false;
+    };
+  }, [isOpen, businessId]);
+
+  async function addCategory() {
+    const name = newName.trim();
+    if (!name || !businessId) return;
+    setAdding(true);
+    try {
+      const { data, error } = await supabase
+        .from("drink_categories")
+        .insert({ business_id: businessId, name })
+        .select("id, name")
+        .single();
+      if (!error && data) {
+        const inserted: Category = {
+          id: String(data.id),
+          name: String(data.name || name),
+        };
+        setCategories((prev) =>
+          [...prev, inserted].sort((a, b) => a.name.localeCompare(b.name))
+        );
+        setNewName("");
+        setShowAdd(false);
+        if (onAdded) onAdded(inserted);
+      }
+    } finally {
+      setAdding(false);
+    }
+  }
+
+  async function deleteCategory(cat: Category) {
+    if (!businessId) return;
+    setDeleting(true);
+    try {
+      await supabase
+        .from("drink_categories")
+        .delete()
+        .eq("id", cat.id)
+        .eq("business_id", businessId);
+      setCategories((prev) => prev.filter((c) => c.id !== cat.id));
+      if (onDeleted) onDeleted(cat.id);
+    } finally {
+      setDeleting(false);
+      setToDelete(null);
+    }
+  }
+
+  async function renameCategory(catId: string) {
+    const name = editName.trim();
+    if (!name || !businessId) return;
+    setRenaming(true);
+    try {
+      const { error } = await supabase
+        .from("drink_categories")
+        .update({ name })
+        .eq("id", catId)
+        .eq("business_id", businessId);
+      if (!error) {
+        setCategories((prev) => {
+          const next = prev.map((c) => (c.id === catId ? { ...c, name } : c));
+          return next.sort((a, b) => a.name.localeCompare(b.name));
+        });
+        if (onRenamed) onRenamed(catId, name);
+        setEditingId(null);
+        setEditName("");
+      }
+    } finally {
+      setRenaming(false);
+    }
+  }
+
+  if (!isOpen) return null;
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center">
+      <div className="absolute inset-0 bg-black/50" onClick={onClose} />
+      <div className="relative z-10 w-full max-w-md rounded-2xl bg-white p-6 text-[var(--oe-black)] shadow-xl ring-1 ring-gray-200">
+        <div className="flex items-center justify-between">
+          <h3 className="text-base font-semibold">List of Categories</h3>
+          <button
+            type="button"
+            onClick={onClose}
+            aria-label="Close"
+            className="rounded-md bg-red-50 hover:bg-red-100 text-red-600"
+            style={{
+              height: 36,
+              width: 36,
+              display: "grid",
+              placeItems: "center",
+            }}
+          >
+            <svg
+              className="h-4 w-4"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+            >
+              <path d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
+        </div>
+
+        <div className="mt-5 max-h-80 overflow-auto">
+          {loading ? (
+            <div className="p-4 text-sm text-gray-600">Loading…</div>
+          ) : error ? (
+            <div className="p-4 text-sm text-red-600">{error}</div>
+          ) : categories.length === 0 ? (
+            <div className="p-4 text-sm text-gray-600">No categories yet.</div>
+          ) : (
+            <div className="space-y-2">
+              {categories.map((c) => (
+                <div
+                  key={c.id}
+                  className="flex items-center justify-between rounded-xl px-5 py-3 text-sm bg-gray-100 hover:bg-gray-200"
+                >
+                  {editingId === c.id ? (
+                    <>
+                      <input
+                        className="mr-2 flex-1 rounded-lg bg-gray-50 border border-transparent px-3 py-2 text-sm focus:border-[var(--oe-green)]/40 focus:ring-2 focus:ring-[var(--oe-green)]/30 outline-none"
+                        value={editName}
+                        onChange={(e) => setEditName(e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter") void renameCategory(c.id);
+                          if (e.key === "Escape") {
+                            setEditingId(null);
+                            setEditName("");
+                          }
+                        }}
+                        autoFocus
+                      />
+                      <div className="flex items-center gap-2">
+                        <button
+                          type="button"
+                          aria-label="Confirm rename"
+                          className={`rounded-md ${
+                            !editName.trim() || renaming
+                              ? "bg-gray-300 text-gray-700 cursor-not-allowed"
+                              : "bg-[var(--oe-green)] text-black hover:opacity-90"
+                          }`}
+                          style={{
+                            height: 28,
+                            width: 28,
+                            display: "grid",
+                            placeItems: "center",
+                          }}
+                          disabled={!editName.trim() || renaming}
+                          onClick={() => renameCategory(c.id)}
+                        >
+                          <svg
+                            className="h-4 w-4"
+                            viewBox="0 0 24 24"
+                            fill="none"
+                            stroke="currentColor"
+                            strokeWidth="2"
+                          >
+                            <path d="M5 13l4 4L19 7" />
+                          </svg>
+                        </button>
+                        <button
+                          type="button"
+                          aria-label="Cancel rename"
+                          className="rounded-md bg-red-50 hover:bg-red-100 text-red-600"
+                          style={{
+                            height: 28,
+                            width: 28,
+                            display: "grid",
+                            placeItems: "center",
+                          }}
+                          onClick={() => {
+                            setEditingId(null);
+                            setEditName("");
+                          }}
+                        >
+                          <svg
+                            className="h-4 w-4"
+                            viewBox="0 0 24 24"
+                            fill="none"
+                            stroke="currentColor"
+                            strokeWidth="2"
+                          >
+                            <path d="M6 18L18 6M6 6l12 12" />
+                          </svg>
+                        </button>
+                      </div>
+                    </>
+                  ) : (
+                    <>
+                      <span className="truncate">{c.name}</span>
+                      <div className="flex items-center gap-2">
+                        <button
+                          type="button"
+                          aria-label={`Rename ${c.name}`}
+                          className="rounded-md bg-black/5 hover:bg-black/10 text-[var(--oe-black)]"
+                          style={{
+                            height: 28,
+                            width: 28,
+                            display: "grid",
+                            placeItems: "center",
+                          }}
+                          onClick={() => {
+                            setEditingId(c.id);
+                            setEditName(c.name);
+                          }}
+                        >
+                          <svg
+                            className="h-4 w-4"
+                            viewBox="0 0 24 24"
+                            fill="none"
+                            stroke="currentColor"
+                            strokeWidth="2"
+                          >
+                            <path d="M4 21h4l11-11-4-4L4 17v4z" />
+                            <path d="M14 7l4 4" />
+                          </svg>
+                        </button>
+                        <button
+                          type="button"
+                          aria-label={`Delete ${c.name}`}
+                          className="rounded-md bg-red-50 hover:bg-red-100 text-red-600"
+                          style={{
+                            height: 28,
+                            width: 28,
+                            display: "grid",
+                            placeItems: "center",
+                          }}
+                          onClick={() => setToDelete(c)}
+                        >
+                          <svg
+                            className="h-4 w-4"
+                            viewBox="0 0 24 24"
+                            fill="none"
+                            stroke="currentColor"
+                            strokeWidth="2"
+                          >
+                            <path d="M3 6h18" />
+                            <path d="M8 6V4h8v2" />
+                            <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" />
+                          </svg>
+                        </button>
+                      </div>
+                    </>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
+        <div className="mt-5 flex flex-col gap-3">
+          {showAdd && (
+            <div className="flex items-center gap-2">
+              <input
+                className="flex-1 rounded-lg bg-gray-50 border border-transparent px-3 py-2 text-sm focus:border-[var(--oe-green)]/40 focus:ring-2 focus:ring-[var(--oe-green)]/30 outline-none"
+                placeholder="New category name"
+                value={newName}
+                onChange={(e) => setNewName(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") void addCategory();
+                }}
+                autoFocus
+              />
+              <button
+                type="button"
+                aria-label="Confirm add category"
+                className={`rounded-md ${
+                  !newName.trim() || adding
+                    ? "bg-gray-300 text-gray-700 cursor-not-allowed"
+                    : "bg-[var(--oe-green)] text-black hover:opacity-90"
+                }`}
+                style={{
+                  height: 36,
+                  width: 36,
+                  display: "grid",
+                  placeItems: "center",
+                }}
+                disabled={!newName.trim() || adding}
+                onClick={addCategory}
+              >
+                <svg
+                  className="h-4 w-4"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                >
+                  <path d="M5 13l4 4L19 7" />
+                </svg>
+              </button>
+              <button
+                type="button"
+                aria-label="Cancel add category"
+                className="rounded-md bg-red-50 hover:bg-red-100 text-red-600"
+                style={{
+                  height: 36,
+                  width: 36,
+                  display: "grid",
+                  placeItems: "center",
+                }}
+                onClick={() => {
+                  setShowAdd(false);
+                  setNewName("");
+                }}
+              >
+                <svg
+                  className="h-4 w-4"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                >
+                  <path d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+          )}
+          {!showAdd && (
+            <div className="flex justify-start">
+              <button
+                type="button"
+                className="inline-flex items-center gap-2 rounded-md bg-black/5 px-3 py-2 text-sm text-[var(--oe-black)] hover:bg-black/10"
+                onClick={() => setShowAdd(true)}
+              >
+                <svg
+                  className="h-4 w-4"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                >
+                  <path d="M12 5v14" />
+                  <path d="M5 12h14" />
+                </svg>
+                Add category
+              </button>
+            </div>
+          )}
+        </div>
+      </div>
+
+      <ConfirmModal
+        isOpen={!!toDelete}
+        title="Delete category?"
+        message={
+          toDelete ? (
+            <span>
+              Are you sure you want to delete <strong>{toDelete.name}</strong>?
+            </span>
+          ) : (
+            ""
+          )
+        }
+        confirmLabel={deleting ? "Deleting…" : "Delete"}
+        onConfirm={() => {
+          if (toDelete) void deleteCategory(toDelete);
+        }}
+        onClose={() => setToDelete(null)}
+      />
+    </div>
+  );
+}
