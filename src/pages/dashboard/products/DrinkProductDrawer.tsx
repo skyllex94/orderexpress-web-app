@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import ConfirmModal from "../../../components/ConfirmModal";
 import ManageDrinkCategoriesModal from "../../../components/modals/ManageDrinkCategoriesModal";
+import ManageDrinkSubcategoriesModal from "../../../components/modals/ManageDrinkSubcategoriesModal";
 import { supabase } from "../../../services/supabase";
 
 type DrinkProductDrawerProps = {
@@ -68,6 +69,8 @@ export default function DrinkProductDrawer({
   const [subcategoryOptions, setSubcategoryOptions] = useState<
     { id: string; name: string }[]
   >([]);
+  const [manageSubcategoriesOpen, setManageSubcategoriesOpen] =
+    useState<boolean>(false);
   const [price, setPrice] = useState("");
   const [reportingCost, setReportingCost] = useState("");
   const [reportingUnit, setReportingUnit] = useState("");
@@ -299,7 +302,7 @@ export default function DrinkProductDrawer({
                       {c.name}
                     </option>
                   ))}
-                  <option value="__new_category__">+ Add new category…</option>
+                  <option value="__new_category__">+ Manage categories…</option>
                 </select>
                 {/* Inline add removed; modal will be used instead */}
               </div>
@@ -324,6 +327,10 @@ export default function DrinkProductDrawer({
                   value={subcategoryId}
                   onChange={(e) => {
                     const id = e.target.value;
+                    if (id === "__manage_subcategories__") {
+                      setManageSubcategoriesOpen(true);
+                      return;
+                    }
                     setSubcategoryId(id);
                     const found = subcategoryOptions.find((s) => s.id === id);
                     setSubcategory(found?.name || "");
@@ -336,6 +343,9 @@ export default function DrinkProductDrawer({
                       {s.name}
                     </option>
                   ))}
+                  <option value="__manage_subcategories__">
+                    + Manage subcategories…
+                  </option>
                 </select>
               </div>
             </div>
@@ -679,6 +689,46 @@ export default function DrinkProductDrawer({
           setCategoryId((currentId) => {
             if (currentId === id) {
               setCategory(name);
+            }
+            return currentId;
+          });
+        }}
+      />
+      <ManageDrinkSubcategoriesModal
+        isOpen={manageSubcategoriesOpen}
+        onClose={() => setManageSubcategoriesOpen(false)}
+        businessId={businessId}
+        onAdded={(inserted) => {
+          setSubcategoryOptions((prev) => {
+            const next = [...prev, inserted].sort((a, b) =>
+              a.name.localeCompare(b.name)
+            );
+            return next;
+          });
+          setSubcategoryId(inserted.id);
+          setSubcategory(inserted.name);
+        }}
+        onDeleted={(deletedId) => {
+          setSubcategoryOptions((prev) =>
+            prev.filter((s) => s.id !== deletedId)
+          );
+          setSubcategoryId((currentId) => {
+            if (currentId === deletedId) {
+              setSubcategory("");
+              return "";
+            }
+            return currentId;
+          });
+        }}
+        onRenamed={(id, name) => {
+          setSubcategoryOptions((prev) => {
+            const next = prev.map((s) => (s.id === id ? { ...s, name } : s));
+            next.sort((a, b) => a.name.localeCompare(b.name));
+            return next;
+          });
+          setSubcategoryId((currentId) => {
+            if (currentId === id) {
+              setSubcategory(name);
             }
             return currentId;
           });

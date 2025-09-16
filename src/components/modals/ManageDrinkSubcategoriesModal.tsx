@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { supabase } from "../../services/supabase";
 import ConfirmModal from "../ConfirmModal";
 
-type Category = { id: string; name: string };
+type Subcategory = { id: string; name: string };
 
 export default function ManageDrinkSubcategoriesModal({
   isOpen,
@@ -15,17 +15,17 @@ export default function ManageDrinkSubcategoriesModal({
   isOpen: boolean;
   onClose: () => void;
   businessId: string;
-  onAdded?: (c: Category) => void;
+  onAdded?: (s: Subcategory) => void;
   onDeleted?: (id: string) => void;
   onRenamed?: (id: string, name: string) => void;
 }) {
   const [loading, setLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
-  const [categories, setCategories] = useState<Category[]>([]);
+  const [subcategories, setSubcategories] = useState<Subcategory[]>([]);
   const [newName, setNewName] = useState<string>("");
   const [adding, setAdding] = useState<boolean>(false);
   const [showAdd, setShowAdd] = useState<boolean>(false);
-  const [toDelete, setToDelete] = useState<Category | null>(null);
+  const [toDelete, setToDelete] = useState<Subcategory | null>(null);
   const [deleting, setDeleting] = useState<boolean>(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editName, setEditName] = useState<string>("");
@@ -39,13 +39,13 @@ export default function ManageDrinkSubcategoriesModal({
       setError(null);
       try {
         const { data, error: err } = await supabase
-          .from("drink_categories")
+          .from("drink_subcategories")
           .select("id, name")
           .eq("business_id", businessId)
           .order("name", { ascending: true });
         if (err) throw err;
         if (!mounted) return;
-        setCategories(
+        setSubcategories(
           (data || []).map((r) => ({
             id: String(r.id),
             name: String(r.name || ""),
@@ -55,7 +55,7 @@ export default function ManageDrinkSubcategoriesModal({
         const message =
           typeof e === "object" && e !== null && "message" in e
             ? String((e as { message?: unknown }).message)
-            : "Failed to load categories";
+            : "Failed to load subcategories";
         if (mounted) setError(message);
       } finally {
         if (mounted) setLoading(false);
@@ -67,22 +67,22 @@ export default function ManageDrinkSubcategoriesModal({
     };
   }, [isOpen, businessId]);
 
-  async function addCategory() {
+  async function addSubcategory() {
     const name = newName.trim();
     if (!name || !businessId) return;
     setAdding(true);
     try {
       const { data, error } = await supabase
-        .from("drink_categories")
+        .from("drink_subcategories")
         .insert({ business_id: businessId, name })
         .select("id, name")
         .single();
       if (!error && data) {
-        const inserted: Category = {
+        const inserted: Subcategory = {
           id: String(data.id),
           name: String(data.name || name),
         };
-        setCategories((prev) =>
+        setSubcategories((prev) =>
           [...prev, inserted].sort((a, b) => a.name.localeCompare(b.name))
         );
         setNewName("");
@@ -94,39 +94,39 @@ export default function ManageDrinkSubcategoriesModal({
     }
   }
 
-  async function deleteCategory(cat: Category) {
+  async function deleteSubcategory(s: Subcategory) {
     if (!businessId) return;
     setDeleting(true);
     try {
       await supabase
-        .from("drink_categories")
+        .from("drink_subcategories")
         .delete()
-        .eq("id", cat.id)
+        .eq("id", s.id)
         .eq("business_id", businessId);
-      setCategories((prev) => prev.filter((c) => c.id !== cat.id));
-      if (onDeleted) onDeleted(cat.id);
+      setSubcategories((prev) => prev.filter((c) => c.id !== s.id));
+      if (onDeleted) onDeleted(s.id);
     } finally {
       setDeleting(false);
       setToDelete(null);
     }
   }
 
-  async function renameCategory(catId: string) {
+  async function renameSubcategory(id: string) {
     const name = editName.trim();
     if (!name || !businessId) return;
     setRenaming(true);
     try {
       const { error } = await supabase
-        .from("drink_categories")
+        .from("drink_subcategories")
         .update({ name })
-        .eq("id", catId)
+        .eq("id", id)
         .eq("business_id", businessId);
       if (!error) {
-        setCategories((prev) => {
-          const next = prev.map((c) => (c.id === catId ? { ...c, name } : c));
+        setSubcategories((prev) => {
+          const next = prev.map((c) => (c.id === id ? { ...c, name } : c));
           return next.sort((a, b) => a.name.localeCompare(b.name));
         });
-        if (onRenamed) onRenamed(catId, name);
+        if (onRenamed) onRenamed(id, name);
         setEditingId(null);
         setEditName("");
       }
@@ -142,7 +142,7 @@ export default function ManageDrinkSubcategoriesModal({
       <div className="absolute inset-0 bg-black/50" onClick={onClose} />
       <div className="relative z-10 w-full max-w-md rounded-2xl bg-white p-6 text-[var(--oe-black)] shadow-xl ring-1 ring-gray-200">
         <div className="flex items-center justify-between">
-          <h3 className="text-base font-semibold">List of Categories</h3>
+          <h3 className="text-base font-semibold">List of Subcategories</h3>
           <button
             type="button"
             onClick={onClose}
@@ -172,23 +172,25 @@ export default function ManageDrinkSubcategoriesModal({
             <div className="p-4 text-sm text-gray-600">Loading…</div>
           ) : error ? (
             <div className="p-4 text-sm text-red-600">{error}</div>
-          ) : categories.length === 0 ? (
-            <div className="p-4 text-sm text-gray-600">No categories yet.</div>
+          ) : subcategories.length === 0 ? (
+            <div className="p-4 text-sm text-gray-600">
+              No subcategories yet.
+            </div>
           ) : (
             <div className="space-y-2">
-              {categories.map((c) => (
+              {subcategories.map((s) => (
                 <div
-                  key={c.id}
+                  key={s.id}
                   className="flex items-center justify-between rounded-xl px-5 py-3 text-sm bg-gray-100 hover:bg-gray-200"
                 >
-                  {editingId === c.id ? (
+                  {editingId === s.id ? (
                     <>
                       <input
                         className="mr-2 flex-1 rounded-lg bg-gray-50 border border-transparent px-3 py-2 text-sm focus:border-[var(--oe-green)]/40 focus:ring-2 focus:ring-[var(--oe-green)]/30 outline-none"
                         value={editName}
                         onChange={(e) => setEditName(e.target.value)}
                         onKeyDown={(e) => {
-                          if (e.key === "Enter") void renameCategory(c.id);
+                          if (e.key === "Enter") void renameSubcategory(s.id);
                           if (e.key === "Escape") {
                             setEditingId(null);
                             setEditName("");
@@ -212,7 +214,7 @@ export default function ManageDrinkSubcategoriesModal({
                             placeItems: "center",
                           }}
                           disabled={!editName.trim() || renaming}
-                          onClick={() => renameCategory(c.id)}
+                          onClick={() => renameSubcategory(s.id)}
                         >
                           <svg
                             className="h-4 w-4"
@@ -253,11 +255,11 @@ export default function ManageDrinkSubcategoriesModal({
                     </>
                   ) : (
                     <>
-                      <span className="truncate">{c.name}</span>
+                      <span className="truncate">{s.name}</span>
                       <div className="flex items-center gap-2">
                         <button
                           type="button"
-                          aria-label={`Rename ${c.name}`}
+                          aria-label={`Rename ${s.name}`}
                           className="rounded-md bg-black/5 hover:bg-black/10 text-[var(--oe-black)]"
                           style={{
                             height: 28,
@@ -266,8 +268,8 @@ export default function ManageDrinkSubcategoriesModal({
                             placeItems: "center",
                           }}
                           onClick={() => {
-                            setEditingId(c.id);
-                            setEditName(c.name);
+                            setEditingId(s.id);
+                            setEditName(s.name);
                           }}
                         >
                           <svg
@@ -283,7 +285,7 @@ export default function ManageDrinkSubcategoriesModal({
                         </button>
                         <button
                           type="button"
-                          aria-label={`Delete ${c.name}`}
+                          aria-label={`Delete ${s.name}`}
                           className="rounded-md bg-red-50 hover:bg-red-100 text-red-600"
                           style={{
                             height: 28,
@@ -291,7 +293,7 @@ export default function ManageDrinkSubcategoriesModal({
                             display: "grid",
                             placeItems: "center",
                           }}
-                          onClick={() => setToDelete(c)}
+                          onClick={() => setToDelete(s)}
                         >
                           <svg
                             className="h-4 w-4"
@@ -319,17 +321,17 @@ export default function ManageDrinkSubcategoriesModal({
             <div className="flex items-center gap-2">
               <input
                 className="flex-1 rounded-lg bg-gray-50 border border-transparent px-3 py-2 text-sm focus:border-[var(--oe-green)]/40 focus:ring-2 focus:ring-[var(--oe-green)]/30 outline-none"
-                placeholder="New category name"
+                placeholder="New subcategory name"
                 value={newName}
                 onChange={(e) => setNewName(e.target.value)}
                 onKeyDown={(e) => {
-                  if (e.key === "Enter") void addCategory();
+                  if (e.key === "Enter") void addSubcategory();
                 }}
                 autoFocus
               />
               <button
                 type="button"
-                aria-label="Confirm add category"
+                aria-label="Confirm add subcategory"
                 className={`rounded-md ${
                   !newName.trim() || adding
                     ? "bg-gray-300 text-gray-700 cursor-not-allowed"
@@ -342,7 +344,7 @@ export default function ManageDrinkSubcategoriesModal({
                   placeItems: "center",
                 }}
                 disabled={!newName.trim() || adding}
-                onClick={addCategory}
+                onClick={addSubcategory}
               >
                 <svg
                   className="h-4 w-4"
@@ -356,7 +358,7 @@ export default function ManageDrinkSubcategoriesModal({
               </button>
               <button
                 type="button"
-                aria-label="Cancel add category"
+                aria-label="Cancel add subcategory"
                 className="rounded-md bg-red-50 hover:bg-red-100 text-red-600"
                 style={{
                   height: 36,
@@ -398,7 +400,7 @@ export default function ManageDrinkSubcategoriesModal({
                   <path d="M12 5v14" />
                   <path d="M5 12h14" />
                 </svg>
-                Add category
+                Add subcategory
               </button>
             </div>
           )}
@@ -407,7 +409,7 @@ export default function ManageDrinkSubcategoriesModal({
 
       <ConfirmModal
         isOpen={!!toDelete}
-        title="Delete category?"
+        title="Delete subcategory?"
         message={
           toDelete ? (
             <span>
@@ -419,7 +421,7 @@ export default function ManageDrinkSubcategoriesModal({
         }
         confirmLabel={deleting ? "Deleting…" : "Delete"}
         onConfirm={() => {
-          if (toDelete) void deleteCategory(toDelete);
+          if (toDelete) void deleteSubcategory(toDelete);
         }}
         onClose={() => setToDelete(null)}
       />
