@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import { supabase } from "../services/supabase";
 import ConfirmModal from "../components/ConfirmModal";
 import AddBusinessModal from "../components/AddBusinessModal";
@@ -34,6 +34,7 @@ const items: SidebarItem[] = [
 
 export default function Dashboard() {
   const navigate = useNavigate();
+  const location = useLocation();
   const [collapsed, setCollapsed] = useState<boolean>(() => {
     try {
       return localStorage.getItem("oe_sidebar_collapsed") === "1";
@@ -112,6 +113,73 @@ export default function Dashboard() {
       : orderingSection === "cart"
       ? "Cart"
       : null;
+
+  // Parse URL whenever it changes to update state
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    const tab = params.get("tab");
+    const section = params.get("section");
+    // Update active tab only when tab param is valid and different
+    if (
+      tab &&
+      (tab === "overview" ||
+        tab === "inventory" ||
+        tab === "products" ||
+        tab === "ordering" ||
+        tab === "analytics" ||
+        tab === "settings")
+    ) {
+      setActive((prev) => (prev !== tab ? tab : prev));
+      // Only update section when tab is explicitly provided
+      if (tab === "products") {
+        if (
+          section === "food" ||
+          section === "drink" ||
+          section === "categories"
+        ) {
+          setProductsSection((prev) => (prev !== section ? section : prev));
+        }
+      } else if (tab === "ordering") {
+        if (section === "vendors" || section === "cart") {
+          setOrderingSection((prev) => (prev !== section ? section : prev));
+        }
+      } else if (tab === "settings") {
+        if (
+          section === "plan" ||
+          section === "users" ||
+          section === "account"
+        ) {
+          setSettingsSection((prev) => (prev !== section ? section : prev));
+        }
+      }
+    }
+  }, [location.search]);
+
+  // Sync URL when tab/section state changes
+  useEffect(() => {
+    const params = new URLSearchParams();
+    params.set("tab", active);
+    if (active === "products" && productsSection)
+      params.set("section", productsSection);
+    if (active === "ordering" && orderingSection)
+      params.set("section", orderingSection);
+    if (active === "settings" && settingsSection)
+      params.set("section", settingsSection);
+    const newSearch = `?${params.toString()}`;
+    if (location.search !== newSearch) {
+      navigate(`/dashboard${newSearch}`, {
+        replace: true,
+        preventScrollReset: true,
+      });
+    }
+  }, [
+    active,
+    productsSection,
+    orderingSection,
+    settingsSection,
+    navigate,
+    location.search,
+  ]);
 
   useEffect(() => {
     let mounted = true;

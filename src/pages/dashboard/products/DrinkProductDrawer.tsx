@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import ConfirmModal from "../../../components/ConfirmModal";
 import ManageDrinkCategoriesModal from "../../../components/modals/ManageDrinkCategoriesModal";
 import ManageDrinkSubcategoriesModal from "../../../components/modals/ManageDrinkSubcategoriesModal";
@@ -94,6 +94,41 @@ export default function DrinkProductDrawer({
   const [pkgToDelete, setPkgToDelete] = useState<string | null>(null);
   const [manageCategoriesOpen, setManageCategoriesOpen] =
     useState<boolean>(false);
+  // Build reporting unit options based on packaging
+  const reportingUnitOptions = useMemo(() => {
+    const options = new Set<string>();
+    for (const p of packaging) {
+      const caseSize = parseInt(p.caseSize, 10);
+      const unitSize = p.unitSize.trim();
+      const measure = p.measureType.trim();
+      const unit = p.unitType.trim();
+      const hasCase = Number.isFinite(caseSize) && caseSize > 0;
+      const hasUnit = unit.length > 0;
+      const hasMeasure = measure.length > 0;
+      const hasUnitSize = unitSize.length > 0;
+      if (hasCase && hasUnitSize && hasMeasure && hasUnit) {
+        options.add(`case (${caseSize} x ${unitSize}${measure} (${unit}))`);
+      }
+      if (hasUnitSize && hasMeasure && hasUnit) {
+        options.add(`${unit} (${unitSize}${measure})`);
+      }
+      if (hasMeasure) {
+        options.add(`${measure}`);
+      }
+    }
+    return Array.from(options);
+  }, [packaging]);
+
+  // Auto-select reporting unit when options change
+  useEffect(() => {
+    if (!reportingUnitOptions || reportingUnitOptions.length === 0) {
+      if (reportingUnit !== "") setReportingUnit("");
+      return;
+    }
+    if (!reportingUnitOptions.includes(reportingUnit)) {
+      setReportingUnit(reportingUnitOptions[0] || "");
+    }
+  }, [reportingUnitOptions, reportingUnit]);
   const isPackagingComplete = (p: PackagingForm) =>
     p.caseSize.trim().length > 0 &&
     p.unitSize.trim().length > 0 &&
@@ -633,12 +668,21 @@ export default function DrinkProductDrawer({
                 <label className="block text-xs font-medium text-gray-700">
                   Reporting Unit
                 </label>
-                <input
-                  className="mt-1 w-full rounded-lg bg-gray-50 border border-transparent px-3 py-2 text-sm focus:border-[var(--oe-green)]/40 focus:ring-2 focus:ring-[var(--oe-green)]/30 outline-none"
-                  placeholder="e.g., oz, unit, bottle"
+                <select
+                  className="mt-1 w-full rounded-lg bg-gray-50 border border-transparent px-2 py-2 text-sm text-[var(--oe-black)] focus:border-[var(--oe-green)]/40 focus:ring-2 focus:ring-[var(--oe-green)]/30 outline-none"
                   value={reportingUnit}
                   onChange={(e) => setReportingUnit(e.target.value)}
-                />
+                >
+                  {reportingUnitOptions.length === 0 ? (
+                    <option value="">No options yet (fill packaging)</option>
+                  ) : (
+                    reportingUnitOptions.map((opt) => (
+                      <option key={opt} value={opt}>
+                        {opt}
+                      </option>
+                    ))
+                  )}
+                </select>
               </div>
             </div>
           </div>
