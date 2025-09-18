@@ -33,6 +33,14 @@ export default function DrinkProductDrawer({
     unitSize: string;
     measureType: string;
     unitType: string;
+    price?: string;
+    vendorId?: string;
+  };
+  type ReportingRow = {
+    id: string;
+    unit: string; // e.g., "case (6 x 1L (bottle))" or "bottle (1L)" or "L"
+    cost: string; // display/input as string; parse later on save
+    isDefault: boolean;
   };
   const measureOptions = [
     "L",
@@ -64,6 +72,9 @@ export default function DrinkProductDrawer({
   const [vendor, setVendor] = useState("");
   const [vendorsLoading, setVendorsLoading] = useState<boolean>(false);
   const [vendorOptions, setVendorOptions] = useState<string[]>([]);
+  const [vendorChoices, setVendorChoices] = useState<
+    { id: string; name: string }[]
+  >([]);
   const [categoriesLoading, setCategoriesLoading] = useState<boolean>(false);
   const [subcategoriesLoading, setSubcategoriesLoading] =
     useState<boolean>(false);
@@ -76,8 +87,7 @@ export default function DrinkProductDrawer({
   const [manageSubcategoriesOpen, setManageSubcategoriesOpen] =
     useState<boolean>(false);
   const [price, setPrice] = useState("");
-  const [reportingCost, setReportingCost] = useState("");
-  const [reportingUnit, setReportingUnit] = useState("");
+  const [reportingRows, setReportingRows] = useState<ReportingRow[]>([]);
   const [notes, setNotes] = useState("");
   const [saving, setSaving] = useState<boolean>(false);
   const [saveError, setSaveError] = useState<string | null>(null);
@@ -88,6 +98,8 @@ export default function DrinkProductDrawer({
       unitSize: "",
       measureType: "",
       unitType: "",
+      price: "",
+      vendorId: "",
     },
   ]);
   const [pkgConfirmOpen, setPkgConfirmOpen] = useState<boolean>(false);
@@ -119,16 +131,33 @@ export default function DrinkProductDrawer({
     return Array.from(options);
   }, [packaging]);
 
-  // Auto-select reporting unit when options change
+  // Initialize reporting rows on open and keep units valid when options change
   useEffect(() => {
-    if (!reportingUnitOptions || reportingUnitOptions.length === 0) {
-      if (reportingUnit !== "") setReportingUnit("");
-      return;
-    }
-    if (!reportingUnitOptions.includes(reportingUnit)) {
-      setReportingUnit(reportingUnitOptions[0] || "");
-    }
-  }, [reportingUnitOptions, reportingUnit]);
+    if (!open) return;
+    setReportingRows((prev) => {
+      // If no rows yet, create one default row based on options
+      if (!prev || prev.length === 0) {
+        const first = reportingUnitOptions[0] || "";
+        return [
+          {
+            id: `rep_${Date.now()}`,
+            unit: first,
+            cost: "",
+            isDefault: true,
+          },
+        ];
+      }
+      // Ensure existing rows have valid unit values against current options
+      const first = reportingUnitOptions[0] || "";
+      let changed = false;
+      const next = prev.map((r) => {
+        if (r.unit && reportingUnitOptions.includes(r.unit)) return r;
+        changed = true;
+        return { ...r, unit: first };
+      });
+      return changed ? next : prev;
+    });
+  }, [open, reportingUnitOptions]);
   const isPackagingComplete = (p: PackagingForm) =>
     p.caseSize.trim().length > 0 &&
     p.unitSize.trim().length > 0 &&
@@ -156,20 +185,16 @@ export default function DrinkProductDrawer({
       setSubcategoryId("");
       setVendor("");
       setPrice("");
-      setReportingCost("");
-      setReportingUnit("");
-      setNotes("");
-      setPackaging([
+      setReportingRows([
         {
-          id: `pkg_${Date.now()}`,
-          caseSize: "",
-          unitSize: "",
-          measureType: "",
-          unitType: "",
+          id: `rep_${Date.now()}`,
+          unit: reportingUnitOptions[0] || "",
+          cost: "",
+          isDefault: true,
         },
       ]);
     }
-  }, [open]);
+  }, [open, reportingUnitOptions]);
 
   // Load existing product when editing
   useEffect(() => {
@@ -197,7 +222,9 @@ export default function DrinkProductDrawer({
       // Load packaging rows for this product
       const { data: pkgRows } = await supabase
         .from("drink_products_packaging")
-        .select("case_size, unit_size, measure_type, unit_type")
+        .select(
+          "units_per_case, unit_volume, measure_type, unit_type, price, vendor_id"
+        )
         .eq("product_id", productId)
         .order("created_at", { ascending: true });
       if (!mounted) return;
@@ -205,10 +232,12 @@ export default function DrinkProductDrawer({
         setPackaging(
           pkgRows.map((r) => ({
             id: `pkg_${Date.now()}_${Math.random().toString(36).slice(2)}`,
-            caseSize: r.case_size != null ? String(r.case_size) : "",
-            unitSize: r.unit_size != null ? String(r.unit_size) : "",
+            caseSize: r.units_per_case != null ? String(r.units_per_case) : "",
+            unitSize: r.unit_volume != null ? String(r.unit_volume) : "",
             measureType: String(r.measure_type || ""),
             unitType: String(r.unit_type || ""),
+            price: r.price != null ? String(r.price) : "",
+            vendorId: r.vendor_id != null ? String(r.vendor_id) : "",
           }))
         );
       } else {
@@ -219,6 +248,8 @@ export default function DrinkProductDrawer({
             unitSize: "",
             measureType: "",
             unitType: "",
+            price: "",
+            vendorId: "",
           },
         ]);
       }
@@ -237,7 +268,7 @@ export default function DrinkProductDrawer({
       try {
         const { data, error } = await supabase
           .from("vendors")
-          .select("name")
+          .select("id, name")
           .eq("business_id", businessId)
           .order("name", { ascending: true });
         if (error) return;
@@ -246,6 +277,11 @@ export default function DrinkProductDrawer({
           .map((v) => String(v.name || ""))
           .filter((n) => n.trim().length > 0);
         setVendorOptions(names);
+        setVendorChoices(
+          (data || [])
+            .filter((v) => v.id && v.name)
+            .map((v) => ({ id: String(v.id), name: String(v.name) }))
+        );
       } finally {
         if (mounted) setVendorsLoading(false);
       }
@@ -458,7 +494,7 @@ export default function DrinkProductDrawer({
           </div>
           {/* Packaging items */}
           <div className="space-y-4">
-            {packaging.map((pkg) => (
+            {packaging.map((pkg, idx) => (
               <div
                 key={pkg.id}
                 className="space-y-3 rounded-xl ring-1 ring-gray-200 p-4 relative"
@@ -490,10 +526,58 @@ export default function DrinkProductDrawer({
                     </svg>
                   </button>
                 )}
+                {/* Dynamic Package title */}
+                <div className="text-sm font-medium text-[var(--oe-black)]">
+                  {`Package #${idx + 1}: `}
+                  <span className="font-normal text-gray-700">
+                    {(() => {
+                      const vendorName = (() => {
+                        const id = (pkg.vendorId || "").trim();
+                        const found = vendorChoices.find(
+                          (v) => v.id === id
+                        )?.name;
+                        return found || "-";
+                      })();
+                      const size = parseInt(pkg.caseSize, 10);
+                      const unitSz = (pkg.unitSize || "").trim();
+                      const measure = (pkg.measureType || "").trim();
+                      const unit = (pkg.unitType || "").trim();
+                      const hasCase = Number.isFinite(size) && size > 0;
+                      const hasUnit = unit.length > 0;
+                      const hasMeasure = measure.length > 0;
+                      const hasUnitSize = unitSz.length > 0;
+                      if (hasCase && hasUnitSize && hasMeasure && hasUnit) {
+                        const unitPlural = (() => {
+                          const map: Record<string, string> = {
+                            bottle: "bottles",
+                            can: "cans",
+                            "can(food)": "cans",
+                            keg: "kegs",
+                            bag: "bags",
+                            box: "boxes",
+                            carton: "cartons",
+                            container: "containers",
+                            package: "packages",
+                            other: "units",
+                          };
+                          return map[unit] || `${unit}s`;
+                        })();
+                        return `${vendorName} / ${size} x ${unitSz}${measure} (${unitPlural})`;
+                      }
+                      if (hasUnitSize && hasMeasure && hasUnit) {
+                        return `${vendorName} / ${unitSz}${measure}(${unit})`;
+                      }
+                      if (hasMeasure) {
+                        return `${vendorName} / ${measure}`;
+                      }
+                      return `${vendorName}`;
+                    })()}
+                  </span>
+                </div>
                 <div className="grid grid-cols-12 gap-3">
                   <div className="col-span-3">
                     <label className="block text-xs font-medium text-gray-700">
-                      Case size
+                      Units per case
                     </label>
                     <input
                       className="mt-1 w-full rounded-lg bg-gray-50 border border-transparent px-3 py-2 text-sm focus:border-[var(--oe-green)]/40 focus:ring-2 focus:ring-[var(--oe-green)]/30 outline-none"
@@ -512,7 +596,7 @@ export default function DrinkProductDrawer({
                   </div>
                   <div className="col-span-3">
                     <label className="block text-xs font-medium text-gray-700">
-                      Unit size
+                      Unit volume
                     </label>
                     <input
                       className="mt-1 w-full rounded-lg bg-gray-50 border border-transparent px-3 py-2 text-sm focus:border-[var(--oe-green)]/40 focus:ring-2 focus:ring-[var(--oe-green)]/30 outline-none"
@@ -531,7 +615,7 @@ export default function DrinkProductDrawer({
                   </div>
                   <div className="col-span-3">
                     <label className="block text-xs font-medium text-gray-700">
-                      Measure
+                      Measure type
                     </label>
                     <select
                       className="mt-1 w-full rounded-lg bg-gray-50 border border-transparent px-2 py-2 text-sm text-[var(--oe-black)] focus:border-[var(--oe-green)]/40 focus:ring-2 focus:ring-[var(--oe-green)]/30 outline-none"
@@ -580,6 +664,122 @@ export default function DrinkProductDrawer({
                     </select>
                   </div>
                 </div>
+                <div className="mt-3 grid grid-cols-12 gap-3">
+                  <div className="col-span-6">
+                    <div className="flex items-baseline justify-between">
+                      <label className="block text-xs font-medium text-gray-700">
+                        Price
+                      </label>
+                      <span className="text-[11px] text-gray-600">
+                        {(() => {
+                          const units = parseInt(pkg.caseSize, 10);
+                          const priceRaw = (pkg.price || "").trim();
+                          const priceParsed = priceRaw
+                            ? Number.parseFloat(
+                                priceRaw.replace(/[^0-9.]/g, "")
+                              )
+                            : NaN;
+                          if (!Number.isFinite(priceParsed) || !(units > 1))
+                            return null;
+                          const per = priceParsed / units;
+                          const unitLabel = (() => {
+                            const u = (pkg.unitType || "").trim();
+                            const map: Record<string, string> = {
+                              bottle: "bottle",
+                              can: "can",
+                              "can(food)": "can",
+                              keg: "keg",
+                              bag: "bag",
+                              box: "box",
+                              carton: "carton",
+                              container: "container",
+                              package: "package",
+                              other: "unit",
+                            };
+                            return map[u] || u || "unit";
+                          })();
+                          return `≈ $${per.toFixed(2)} per ${unitLabel}`;
+                        })()}
+                      </span>
+                    </div>
+                    <div className="relative mt-1">
+                      <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-gray-500">
+                        $
+                      </span>
+                      <input
+                        className="w-full rounded-lg bg-gray-50 border border-transparent pl-6 pr-28 py-2 text-sm focus:border-[var(--oe-green)]/40 focus:ring-2 focus:ring-[var(--oe-green)]/30 outline-none"
+                        placeholder="0.00"
+                        value={pkg.price || ""}
+                        onChange={(e) =>
+                          setPackaging((prev) =>
+                            prev.map((p) =>
+                              p.id === pkg.id
+                                ? { ...p, price: e.target.value }
+                                : p
+                            )
+                          )
+                        }
+                      />
+                      <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-[11px] text-gray-500">
+                        {(() => {
+                          const units = parseInt(pkg.caseSize, 10);
+                          const unitSz = (pkg.unitSize || "").trim();
+                          const measure = (pkg.measureType || "").trim();
+                          const unit = (pkg.unitType || "").trim();
+                          const hasCase = Number.isFinite(units) && units > 0;
+                          const hasUnit = unit.length > 0;
+                          const hasMeasure = measure.length > 0;
+                          const hasUnitSize = unitSz.length > 0;
+                          if (hasCase && hasUnitSize && hasMeasure && hasUnit) {
+                            const unitPlural = (() => {
+                              const map: Record<string, string> = {
+                                bottle: "bottles",
+                                can: "cans",
+                                "can(food)": "cans",
+                                keg: "kegs",
+                                bag: "bags",
+                                box: "boxes",
+                                carton: "cartons",
+                                container: "containers",
+                                package: "packages",
+                                other: "units",
+                              };
+                              return map[unit] || `${unit}s`;
+                            })();
+                            return `/ ${units} x ${unitSz}${measure} (${unitPlural})`;
+                          }
+                          return "";
+                        })()}
+                      </span>
+                    </div>
+                  </div>
+                  <div className="col-span-6">
+                    <label className="block text-xs font-medium text-gray-700">
+                      Vendor
+                    </label>
+                    <select
+                      className="mt-1 w-full rounded-lg bg-gray-50 border border-transparent px-2 py-2 text-sm text-[var(--oe-black)] focus:border-[var(--oe-green)]/40 focus:ring-2 focus:ring-[var(--oe-green)]/30 outline-none"
+                      value={pkg.vendorId || ""}
+                      onChange={(e) =>
+                        setPackaging((prev) =>
+                          prev.map((p) =>
+                            p.id === pkg.id
+                              ? { ...p, vendorId: e.target.value }
+                              : p
+                          )
+                        )
+                      }
+                      disabled={vendorsLoading}
+                    >
+                      <option value="">Select a vendor…</option>
+                      {vendorChoices.map((v) => (
+                        <option key={v.id} value={v.id}>
+                          {v.name}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
                 {/* Delete button moved to top-right; only shown if more than 1 */}
               </div>
             ))}
@@ -597,6 +797,8 @@ export default function DrinkProductDrawer({
                       unitSize: "",
                       measureType: "",
                       unitType: "",
+                      price: "",
+                      vendorId: "",
                     },
                   ])
                 }
@@ -652,37 +854,139 @@ export default function DrinkProductDrawer({
             <h4 className="text-sm font-semibold text-[var(--oe-black)]">
               Reporting
             </h4>
-            <div className="mt-3 grid grid-cols-12 gap-3">
-              <div className="col-span-6">
-                <label className="block text-xs font-medium text-gray-700">
-                  Cost
-                </label>
-                <input
-                  className="mt-1 w-full rounded-lg bg-gray-50 border border-transparent px-3 py-2 text-sm focus:border-[var(--oe-green)]/40 focus:ring-2 focus:ring-[var(--oe-green)]/30 outline-none"
-                  placeholder="$0.00"
-                  value={reportingCost}
-                  onChange={(e) => setReportingCost(e.target.value)}
-                />
-              </div>
-              <div className="col-span-6">
-                <label className="block text-xs font-medium text-gray-700">
-                  Reporting Unit
-                </label>
-                <select
-                  className="mt-1 w-full rounded-lg bg-gray-50 border border-transparent px-2 py-2 text-sm text-[var(--oe-black)] focus:border-[var(--oe-green)]/40 focus:ring-2 focus:ring-[var(--oe-green)]/30 outline-none"
-                  value={reportingUnit}
-                  onChange={(e) => setReportingUnit(e.target.value)}
+            <div className="mt-3 space-y-3">
+              {reportingRows.map((row) => (
+                <div
+                  key={row.id}
+                  className="grid grid-cols-12 gap-3 relative ring-1 ring-gray-100 rounded-lg p-3"
                 >
-                  {reportingUnitOptions.length === 0 ? (
-                    <option value="">No options yet (fill packaging)</option>
-                  ) : (
-                    reportingUnitOptions.map((opt) => (
-                      <option key={opt} value={opt}>
-                        {opt}
-                      </option>
-                    ))
+                  {reportingRows.length > 1 && (
+                    <button
+                      type="button"
+                      aria-label="Delete reporting"
+                      className="absolute top-2 right-2 rounded-md bg-red-50 hover:bg-red-100 text-red-600"
+                      style={{
+                        height: 28,
+                        width: 28,
+                        display: "grid",
+                        placeItems: "center",
+                      }}
+                      onClick={() => {
+                        setReportingRows((prev) =>
+                          prev.filter((r) => r.id !== row.id)
+                        );
+                      }}
+                    >
+                      <svg
+                        className="h-3.5 w-3.5"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="2"
+                      >
+                        <path d="M6 18L18 6M6 6l12 12" />
+                      </svg>
+                    </button>
                   )}
-                </select>
+                  <div className="col-span-12 sm:col-span-6 flex items-end gap-3">
+                    <div className="flex items-center">
+                      <input
+                        type="radio"
+                        name="defaultReporting"
+                        className="h-4 w-4 text-[var(--oe-green)]"
+                        checked={row.isDefault}
+                        onChange={() =>
+                          setReportingRows((prev) =>
+                            prev.map((r) => ({
+                              ...r,
+                              isDefault: r.id === row.id,
+                            }))
+                          )
+                        }
+                        aria-label="Default reporting"
+                      />
+                    </div>
+                    <div className="flex-1">
+                      <label className="block text-xs font-medium text-gray-700">
+                        Reporting Unit
+                      </label>
+                      <select
+                        className="mt-1 w-full rounded-lg bg-gray-50 border border-transparent px-2 py-2 text-sm text-[var(--oe-black)] focus:border-[var(--oe-green)]/40 focus:ring-2 focus:ring-[var(--oe-green)]/30 outline-none"
+                        value={row.unit}
+                        onChange={(e) =>
+                          setReportingRows((prev) =>
+                            prev.map((r) =>
+                              r.id === row.id
+                                ? { ...r, unit: e.target.value }
+                                : r
+                            )
+                          )
+                        }
+                        disabled={reportingUnitOptions.length === 0}
+                      >
+                        {reportingUnitOptions.length === 0 ? (
+                          <option value="">
+                            No options yet (fill packaging)
+                          </option>
+                        ) : (
+                          reportingUnitOptions.map((opt) => (
+                            <option key={opt} value={opt}>
+                              {opt}
+                            </option>
+                          ))
+                        )}
+                      </select>
+                    </div>
+                  </div>
+                  <div className="col-span-12 sm:col-span-6">
+                    <label className="block text-xs font-medium text-gray-700">
+                      Cost
+                    </label>
+                    <input
+                      className="mt-1 w-full rounded-lg bg-gray-50 border border-transparent px-3 py-2 text-sm focus:border-[var(--oe-green)]/40 focus:ring-2 focus:ring-[var(--oe-green)]/30 outline-none"
+                      placeholder="$0.00"
+                      value={row.cost}
+                      onChange={(e) =>
+                        setReportingRows((prev) =>
+                          prev.map((r) =>
+                            r.id === row.id ? { ...r, cost: e.target.value } : r
+                          )
+                        )
+                      }
+                    />
+                  </div>
+                </div>
+              ))}
+              <div>
+                <button
+                  type="button"
+                  onClick={() =>
+                    setReportingRows((prev) => [
+                      ...prev,
+                      {
+                        id: `rep_${Date.now()}_${Math.random()
+                          .toString(36)
+                          .slice(2)}`,
+                        unit: reportingUnitOptions[0] || "",
+                        cost: "",
+                        isDefault: prev.length === 0,
+                      },
+                    ])
+                  }
+                  className="inline-flex items-center gap-2 rounded-md bg-black/5 px-3 py-2 text-sm text-[var(--oe-black)] hover:bg-black/10"
+                >
+                  <svg
+                    className="h-4 w-4"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                  >
+                    <path d="M12 5v14" />
+                    <path d="M5 12h14" />
+                  </svg>
+                  Add reporting
+                </button>
               </div>
             </div>
           </div>
@@ -770,14 +1074,25 @@ export default function DrinkProductDrawer({
                   } else if (inserted?.id) {
                     const packagingRows = packaging
                       .filter(isPackagingComplete)
-                      .map((p) => ({
-                        product_id: inserted.id,
-                        case_size: parseInt(p.caseSize, 10),
-                        unit_size: parseFloat(p.unitSize),
-                        measure_type: p.measureType,
-                        unit_type: p.unitType,
-                        notes: null as string | null,
-                      }));
+                      .map((p) => {
+                        const priceRaw = (p.price || "").trim();
+                        const priceParsed = priceRaw
+                          ? Number.parseFloat(priceRaw.replace(/[^0-9.]/g, ""))
+                          : NaN;
+                        const priceValue = Number.isFinite(priceParsed)
+                          ? Number(priceParsed.toFixed(2))
+                          : null;
+                        return {
+                          product_id: inserted.id,
+                          units_per_case: parseInt(p.caseSize, 10),
+                          unit_volume: parseFloat(p.unitSize),
+                          measure_type: p.measureType,
+                          unit_type: p.unitType,
+                          price: priceValue as number | null,
+                          vendor_id: p.vendorId || null,
+                          notes: null as string | null,
+                        };
+                      });
                     if (packagingRows.length > 0) {
                       const { error: pkgError } = await supabase
                         .from("drink_products_packaging")
@@ -813,6 +1128,49 @@ export default function DrinkProductDrawer({
                   if (error) {
                     setSaveError(error.message || "Failed to update product.");
                   } else {
+                    // Optional: update packaging too when editing (simple approach: delete+insert)
+                    const { error: delErr } = await supabase
+                      .from("drink_products_packaging")
+                      .delete()
+                      .eq("product_id", productId);
+                    if (delErr) {
+                      setSaveError(
+                        delErr.message || "Failed to update packaging."
+                      );
+                      return;
+                    }
+                    const packagingRows = packaging
+                      .filter(isPackagingComplete)
+                      .map((p) => {
+                        const priceRaw = (p.price || "").trim();
+                        const priceParsed = priceRaw
+                          ? Number.parseFloat(priceRaw.replace(/[^0-9.]/g, ""))
+                          : NaN;
+                        const priceValue = Number.isFinite(priceParsed)
+                          ? Number(priceParsed.toFixed(2))
+                          : null;
+                        return {
+                          product_id: productId,
+                          units_per_case: parseInt(p.caseSize, 10),
+                          unit_volume: parseFloat(p.unitSize),
+                          measure_type: p.measureType,
+                          unit_type: p.unitType,
+                          price: priceValue as number | null,
+                          vendor_id: p.vendorId || null,
+                          notes: null as string | null,
+                        };
+                      });
+                    if (packagingRows.length > 0) {
+                      const { error: insErr } = await supabase
+                        .from("drink_products_packaging")
+                        .insert(packagingRows);
+                      if (insErr) {
+                        setSaveError(
+                          insErr.message || "Failed to update packaging."
+                        );
+                        return;
+                      }
+                    }
                     onClose();
                     if (onSaved) {
                       onSaved();
