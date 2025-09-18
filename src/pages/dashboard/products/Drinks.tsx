@@ -10,7 +10,15 @@ type UIProductRow = {
   cost: string; // display-ready, e.g., "$24.00"
 };
 
-export default function ProductsDrinks({ businessId }: { businessId: string }) {
+export default function ProductsDrinks({
+  businessId,
+  onOpenProduct,
+  refreshKey,
+}: {
+  businessId: string;
+  onOpenProduct: (id: string) => void;
+  refreshKey?: number;
+}) {
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
   const [products, setProducts] = useState<UIProductRow[]>([]);
@@ -42,7 +50,6 @@ export default function ProductsDrinks({ businessId }: { businessId: string }) {
       setLoading(true);
       setError(null);
       try {
-        // Fetch from drink_products for current business
         const { data, error: err } = await supabase
           .from("drink_products")
           .select("id, name, category, vendor")
@@ -71,12 +78,11 @@ export default function ProductsDrinks({ businessId }: { businessId: string }) {
       }
     }
     load();
-    // Clear selection when switching businesses
     setSelectedIds(new Set());
     return () => {
       mounted = false;
     };
-  }, [businessId]);
+  }, [businessId, refreshKey]);
 
   function toggleRow(id: string) {
     setSelectedIds((prev) => {
@@ -191,9 +197,13 @@ export default function ProductsDrinks({ businessId }: { businessId: string }) {
                         />
                       </td>
                       <td className="px-2 sm:px-3 py-3 align-middle">
-                        <div className="text-sm font-medium text-[var(--oe-black)]">
+                        <button
+                          type="button"
+                          className="text-sm font-medium text-[var(--oe-black)] hover:underline"
+                          onClick={() => onOpenProduct(p.id)}
+                        >
                           {p.name}
-                        </div>
+                        </button>
                         <div className="sm:hidden mt-1 grid grid-cols-2 gap-x-2 gap-y-1 text-xs text-gray-600">
                           <div className="font-medium">Category:</div>
                           <div>{p.category}</div>

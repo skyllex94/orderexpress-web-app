@@ -79,6 +79,10 @@ export default function Dashboard() {
   >("vendors");
   const [addVendorOpen, setAddVendorOpen] = useState<boolean>(false);
   const [drinkDrawerOpen, setDrinkDrawerOpen] = useState<boolean>(false);
+  const [editingDrinkProductId, setEditingDrinkProductId] = useState<
+    string | null
+  >(null);
+  const [drinksRefreshKey, setDrinksRefreshKey] = useState<number>(0);
 
   const activeLabel: string =
     active === "settings"
@@ -833,7 +837,10 @@ export default function Dashboard() {
                 <button
                   type="button"
                   className="inline-flex items-center gap-2 rounded-md bg-[var(--oe-green)] px-3 py-2 text-sm font-medium text-black hover:opacity-90 focus:outline-none focus:ring-2 focus:ring-[var(--oe-green)]/60"
-                  onClick={() => setDrinkDrawerOpen(true)}
+                  onClick={() => {
+                    setEditingDrinkProductId(null);
+                    setDrinkDrawerOpen(true);
+                  }}
                 >
                   <svg
                     className="h-4 w-4"
@@ -912,7 +919,14 @@ export default function Dashboard() {
             <>
               {productsSection === "food" && <ProductsFood />}
               {productsSection === "drink" && (
-                <ProductsDrinks businessId={businessId} />
+                <ProductsDrinks
+                  businessId={businessId}
+                  refreshKey={drinksRefreshKey}
+                  onOpenProduct={(id) => {
+                    setEditingDrinkProductId(id);
+                    setDrinkDrawerOpen(true);
+                  }}
+                />
               )}
               {productsSection === "categories" && <ProductsCategories />}
             </>
@@ -1466,6 +1480,11 @@ export default function Dashboard() {
         }
         onClose={() => setDrinkDrawerOpen(false)}
         businessId={businessId}
+        productId={editingDrinkProductId}
+        onSaved={() => {
+          setDrinksRefreshKey((k) => k + 1);
+          setEditingDrinkProductId(null);
+        }}
       />
       <ConfirmModal
         isOpen={switchConfirmOpen}

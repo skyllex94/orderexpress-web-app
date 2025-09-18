@@ -8,12 +8,16 @@ type DrinkProductDrawerProps = {
   open: boolean;
   onClose: () => void;
   businessId: string;
+  productId?: string | null;
+  onSaved?: () => void;
 };
 
 export default function DrinkProductDrawer({
   open,
   onClose,
   businessId,
+  productId,
+  onSaved,
 }: DrinkProductDrawerProps) {
   const overlayRef = useRef<HTMLDivElement>(null);
   const [name, setName] = useState("");
@@ -132,6 +136,64 @@ export default function DrinkProductDrawer({
     }
   }, [open]);
 
+  // Load existing product when editing
+  useEffect(() => {
+    let mounted = true;
+    async function loadProduct() {
+      if (!open || !productId) return;
+      const { data, error } = await supabase
+        .from("drink_products")
+        .select(
+          "id, name, sku, category, subcategory, category_id, subcategory_id, vendor, price, notes"
+        )
+        .eq("id", productId)
+        .single();
+      if (error || !data) return;
+      if (!mounted) return;
+      setName(String(data.name || ""));
+      setSku(String(data.sku || ""));
+      setCategory(String(data.category || ""));
+      setSubcategory(String(data.subcategory || ""));
+      setCategoryId(String(data.category_id || ""));
+      setSubcategoryId(String(data.subcategory_id || ""));
+      setVendor(String(data.vendor || ""));
+      setPrice(typeof data.price === "number" ? String(data.price) : "");
+      setNotes(String(data.notes || ""));
+      // Load packaging rows for this product
+      const { data: pkgRows } = await supabase
+        .from("drink_products_packaging")
+        .select("case_size, unit_size, measure_type, unit_type")
+        .eq("product_id", productId)
+        .order("created_at", { ascending: true });
+      if (!mounted) return;
+      if (pkgRows && pkgRows.length > 0) {
+        setPackaging(
+          pkgRows.map((r) => ({
+            id: `pkg_${Date.now()}_${Math.random().toString(36).slice(2)}`,
+            caseSize: r.case_size != null ? String(r.case_size) : "",
+            unitSize: r.unit_size != null ? String(r.unit_size) : "",
+            measureType: String(r.measure_type || ""),
+            unitType: String(r.unit_type || ""),
+          }))
+        );
+      } else {
+        setPackaging([
+          {
+            id: `pkg_${Date.now()}`,
+            caseSize: "",
+            unitSize: "",
+            measureType: "",
+            unitType: "",
+          },
+        ]);
+      }
+    }
+    loadProduct();
+    return () => {
+      mounted = false;
+    };
+  }, [open, productId]);
+
   useEffect(() => {
     let mounted = true;
     async function loadVendors() {
@@ -235,10 +297,12 @@ export default function DrinkProductDrawer({
         <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
           <div>
             <h3 className="text-base font-semibold text-[var(--oe-black)]">
-              Add Drink Product
+              {productId ? "Edit Drink Product" : "Add Drink Product"}
             </h3>
             <p className="text-xs text-gray-600">
-              Enter details for a new item.
+              {productId
+                ? "Update item details."
+                : "Enter details for a new item."}
             </p>
           </div>
 
@@ -602,12 +666,18 @@ export default function DrinkProductDrawer({
           <button
             type="button"
             className={`inline-flex items-center gap-2 rounded-md px-3 py-2 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-[var(--oe-green)]/60 ${
-              saving || !name.trim() || !businessId || !allPackagingComplete
+              saving ||
+              !name.trim() ||
+              !businessId ||
+              (!productId && !allPackagingComplete)
                 ? "bg-gray-300 text-gray-700 cursor-not-allowed"
                 : "bg-[var(--oe-green)] text-black hover:opacity-90"
             }`}
             disabled={
-              saving || !name.trim() || !businessId || !allPackagingComplete
+              saving ||
+              !name.trim() ||
+              !businessId ||
+              (!productId && !allPackagingComplete)
             }
             onClick={async () => {
               if (!name.trim()) {
@@ -618,7 +688,7 @@ export default function DrinkProductDrawer({
                 setSaveError("Missing business context.");
                 return;
               }
-              if (!allPackagingComplete) {
+              if (!productId && !allPackagingComplete) {
                 setSaveError("Please complete all packaging fields.");
                 return;
               }
@@ -632,49 +702,78 @@ export default function DrinkProductDrawer({
                 const priceValue = Number.isFinite(priceParsed)
                   ? priceParsed
                   : null;
-                const row = {
-                  business_id: businessId,
-                  name: name.trim(),
-                  brand_name: null as string | null,
-                  category: category.trim() || null,
-                  subcategory: subcategory.trim() || null,
-                  category_id: categoryId || null,
-                  subcategory_id: subcategoryId || null,
-                  vendor: vendor.trim() || null,
-                  sku: sku.trim() || null,
-                  price: priceValue as number | null,
-                  notes: notes.trim() || null,
-                };
-                const { data: inserted, error } = await supabase
-                  .from("drink_products")
-                  .insert([row])
-                  .select("id")
-                  .single();
-                if (error) {
-                  setSaveError(error.message || "Failed to save product.");
-                } else if (inserted?.id) {
-                  const packagingRows = packaging
-                    .filter(isPackagingComplete)
-                    .map((p) => ({
-                      product_id: inserted.id,
-                      case_size: parseInt(p.caseSize, 10),
-                      unit_size: parseFloat(p.unitSize),
-                      measure_type: p.measureType,
-                      unit_type: p.unitType,
-                      notes: null as string | null,
-                    }));
-                  if (packagingRows.length > 0) {
-                    const { error: pkgError } = await supabase
-                      .from("drink_products_packaging")
-                      .insert(packagingRows);
-                    if (pkgError) {
-                      setSaveError(
-                        pkgError.message || "Failed to save packaging."
-                      );
-                      return;
+                if (!productId) {
+                  const row = {
+                    business_id: businessId,
+                    name: name.trim(),
+                    brand_name: null as string | null,
+                    category: category.trim() || null,
+                    subcategory: subcategory.trim() || null,
+                    category_id: categoryId || null,
+                    subcategory_id: subcategoryId || null,
+                    vendor: vendor.trim() || null,
+                    sku: sku.trim() || null,
+                    price: priceValue as number | null,
+                    notes: notes.trim() || null,
+                  };
+                  const { data: inserted, error } = await supabase
+                    .from("drink_products")
+                    .insert([row])
+                    .select("id")
+                    .single();
+                  if (error) {
+                    setSaveError(error.message || "Failed to save product.");
+                  } else if (inserted?.id) {
+                    const packagingRows = packaging
+                      .filter(isPackagingComplete)
+                      .map((p) => ({
+                        product_id: inserted.id,
+                        case_size: parseInt(p.caseSize, 10),
+                        unit_size: parseFloat(p.unitSize),
+                        measure_type: p.measureType,
+                        unit_type: p.unitType,
+                        notes: null as string | null,
+                      }));
+                    if (packagingRows.length > 0) {
+                      const { error: pkgError } = await supabase
+                        .from("drink_products_packaging")
+                        .insert(packagingRows);
+                      if (pkgError) {
+                        setSaveError(
+                          pkgError.message || "Failed to save packaging."
+                        );
+                        return;
+                      }
+                    }
+                    onClose();
+                    if (onSaved) {
+                      onSaved();
                     }
                   }
-                  onClose();
+                } else {
+                  const updates = {
+                    name: name.trim(),
+                    category: category.trim() || null,
+                    subcategory: subcategory.trim() || null,
+                    category_id: categoryId || null,
+                    subcategory_id: subcategoryId || null,
+                    vendor: vendor.trim() || null,
+                    sku: sku.trim() || null,
+                    price: priceValue as number | null,
+                    notes: notes.trim() || null,
+                  };
+                  const { error } = await supabase
+                    .from("drink_products")
+                    .update(updates)
+                    .eq("id", productId);
+                  if (error) {
+                    setSaveError(error.message || "Failed to update product.");
+                  } else {
+                    onClose();
+                    if (onSaved) {
+                      onSaved();
+                    }
+                  }
                 }
               } finally {
                 setSaving(false);
