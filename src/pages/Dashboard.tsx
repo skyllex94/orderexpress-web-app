@@ -911,7 +911,9 @@ export default function Dashboard() {
           {active === "products" && (
             <>
               {productsSection === "food" && <ProductsFood />}
-              {productsSection === "drink" && <ProductsDrinks />}
+              {productsSection === "drink" && (
+                <ProductsDrinks businessId={businessId} />
+              )}
               {productsSection === "categories" && <ProductsCategories />}
             </>
           )}

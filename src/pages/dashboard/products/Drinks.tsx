@@ -10,7 +10,7 @@ type UIProductRow = {
   cost: string; // display-ready, e.g., "$24.00"
 };
 
-export default function ProductsDrinks() {
+export default function ProductsDrinks({ businessId }: { businessId: string }) {
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
   const [products, setProducts] = useState<UIProductRow[]>([]);
@@ -34,13 +34,19 @@ export default function ProductsDrinks() {
   useEffect(() => {
     let mounted = true;
     async function load() {
+      if (!businessId) {
+        setProducts([]);
+        setLoading(false);
+        return;
+      }
       setLoading(true);
       setError(null);
       try {
-        // Fetch from drink_products; adapt to display columns
+        // Fetch from drink_products for current business
         const { data, error: err } = await supabase
           .from("drink_products")
           .select("id, name, category, vendor")
+          .eq("business_id", businessId)
           .order("created_at", { ascending: false });
         if (err) throw err;
         if (!mounted) return;
@@ -65,10 +71,12 @@ export default function ProductsDrinks() {
       }
     }
     load();
+    // Clear selection when switching businesses
+    setSelectedIds(new Set());
     return () => {
       mounted = false;
     };
-  }, []);
+  }, [businessId]);
 
   function toggleRow(id: string) {
     setSelectedIds((prev) => {
