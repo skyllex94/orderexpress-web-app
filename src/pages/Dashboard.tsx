@@ -442,7 +442,7 @@ export default function Dashboard() {
   }
 
   return (
-    <div className="flex min-h-screen">
+    <div className="flex min-h-screen mt-2">
       <aside
         className={`hidden md:block transition-all duration-300 ${
           collapsed ? "w-16" : "w-52"
