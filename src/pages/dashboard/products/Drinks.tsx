@@ -50,21 +50,47 @@ export default function ProductsDrinks({
       setLoading(true);
       setError(null);
       try {
+        // Fetch products plus packaging vendors; dedupe vendors per product
+        type PackagingRow = {
+          vendor_id: string | null;
+          vendors: { name: string | null } | null;
+        };
+        type ProductRow = {
+          id: string;
+          name: string | null;
+          category: string | null;
+          drink_products_packaging: PackagingRow[] | null;
+        };
         const { data, error: err } = await supabase
           .from("drink_products")
-          .select("id, name, category, vendor")
+          .select(
+            "id, name, category, drink_products_packaging(vendor_id, vendors(name))"
+          )
           .eq("business_id", businessId)
           .order("created_at", { ascending: false });
         if (err) throw err;
         if (!mounted) return;
-        const mapped: UIProductRow[] = (data || []).map((r) => ({
-          id: r.id as string,
-          name: (r.name as string) || "Untitled",
-          category: (r.category as string) || "-",
-          vendor: (r.vendor as string) || "-",
-          measuringUnit: "-",
-          cost: "-",
-        }));
+        const rows: ProductRow[] = (data || []) as unknown as ProductRow[];
+        const mapped: UIProductRow[] = rows.map((r) => {
+          // Collect vendor names from packaging->vendors
+          const vendorNames = new Set<string>();
+          const pkgs: PackagingRow[] = Array.isArray(r.drink_products_packaging)
+            ? (r.drink_products_packaging as PackagingRow[])
+            : [];
+          for (const p of pkgs) {
+            const nm = p?.vendors?.name || null;
+            if (nm && nm.trim().length > 0) vendorNames.add(nm.trim());
+          }
+          const vendorList = Array.from(vendorNames).join(", ") || "-";
+          return {
+            id: r.id,
+            name: r.name || "Untitled",
+            category: r.category || "-",
+            vendor: vendorList,
+            measuringUnit: "-",
+            cost: "-",
+          };
+        });
         setProducts(mapped);
       } catch (e: unknown) {
         const message =

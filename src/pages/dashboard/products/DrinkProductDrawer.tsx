@@ -91,6 +91,8 @@ export default function DrinkProductDrawer({
   const [notes, setNotes] = useState("");
   const [saving, setSaving] = useState<boolean>(false);
   const [saveError, setSaveError] = useState<string | null>(null);
+  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState<boolean>(false);
+  const [deleting, setDeleting] = useState<boolean>(false);
   const [packaging, setPackaging] = useState<PackagingForm[]>([
     {
       id: `pkg_${Date.now()}`,
@@ -698,7 +700,7 @@ export default function DrinkProductDrawer({
                             };
                             return map[u] || u || "unit";
                           })();
-                          return `≈ $${per.toFixed(2)} per ${unitLabel}`;
+                          return `$${per.toFixed(2)} per ${unitLabel}`;
                         })()}
                       </span>
                     </div>
@@ -1003,189 +1005,15 @@ export default function DrinkProductDrawer({
           </div>
         </div>
 
-        <div className="px-5 py-4 border-t border-gray-100 flex items-center justify-end gap-3">
-          <button
-            type="button"
-            className="rounded-md px-3 py-2 text-sm bg-gray-100 text-gray-800 hover:bg-gray-200"
-            onClick={onClose}
-          >
-            Cancel
-          </button>
-          <button
-            type="button"
-            className={`inline-flex items-center gap-2 rounded-md px-3 py-2 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-[var(--oe-green)]/60 ${
-              saving ||
-              !name.trim() ||
-              !businessId ||
-              (!productId && !allPackagingComplete)
-                ? "bg-gray-300 text-gray-700 cursor-not-allowed"
-                : "bg-[var(--oe-green)] text-black hover:opacity-90"
-            }`}
-            disabled={
-              saving ||
-              !name.trim() ||
-              !businessId ||
-              (!productId && !allPackagingComplete)
-            }
-            onClick={async () => {
-              if (!name.trim()) {
-                setSaveError("Product name is required");
-                return;
-              }
-              if (!businessId) {
-                setSaveError("Missing business context.");
-                return;
-              }
-              if (!productId && !allPackagingComplete) {
-                setSaveError("Please complete all packaging fields.");
-                return;
-              }
-              setSaveError(null);
-              setSaving(true);
-              try {
-                const priceValueRaw = price.trim();
-                const priceParsed = priceValueRaw
-                  ? Number.parseFloat(priceValueRaw.replace(/[^0-9.]/g, ""))
-                  : NaN;
-                const priceValue = Number.isFinite(priceParsed)
-                  ? priceParsed
-                  : null;
-                if (!productId) {
-                  const row = {
-                    business_id: businessId,
-                    name: name.trim(),
-                    brand_name: null as string | null,
-                    category: category.trim() || null,
-                    subcategory: subcategory.trim() || null,
-                    category_id: categoryId || null,
-                    subcategory_id: subcategoryId || null,
-                    vendor: vendor.trim() || null,
-                    sku: sku.trim() || null,
-                    price: priceValue as number | null,
-                    notes: notes.trim() || null,
-                  };
-                  const { data: inserted, error } = await supabase
-                    .from("drink_products")
-                    .insert([row])
-                    .select("id")
-                    .single();
-                  if (error) {
-                    setSaveError(error.message || "Failed to save product.");
-                  } else if (inserted?.id) {
-                    const packagingRows = packaging
-                      .filter(isPackagingComplete)
-                      .map((p) => {
-                        const priceRaw = (p.price || "").trim();
-                        const priceParsed = priceRaw
-                          ? Number.parseFloat(priceRaw.replace(/[^0-9.]/g, ""))
-                          : NaN;
-                        const priceValue = Number.isFinite(priceParsed)
-                          ? Number(priceParsed.toFixed(2))
-                          : null;
-                        return {
-                          product_id: inserted.id,
-                          units_per_case: parseInt(p.caseSize, 10),
-                          unit_volume: parseFloat(p.unitSize),
-                          measure_type: p.measureType,
-                          unit_type: p.unitType,
-                          price: priceValue as number | null,
-                          vendor_id: p.vendorId || null,
-                          notes: null as string | null,
-                        };
-                      });
-                    if (packagingRows.length > 0) {
-                      const { error: pkgError } = await supabase
-                        .from("drink_products_packaging")
-                        .insert(packagingRows);
-                      if (pkgError) {
-                        setSaveError(
-                          pkgError.message || "Failed to save packaging."
-                        );
-                        return;
-                      }
-                    }
-                    onClose();
-                    if (onSaved) {
-                      onSaved();
-                    }
-                  }
-                } else {
-                  const updates = {
-                    name: name.trim(),
-                    category: category.trim() || null,
-                    subcategory: subcategory.trim() || null,
-                    category_id: categoryId || null,
-                    subcategory_id: subcategoryId || null,
-                    vendor: vendor.trim() || null,
-                    sku: sku.trim() || null,
-                    price: priceValue as number | null,
-                    notes: notes.trim() || null,
-                  };
-                  const { error } = await supabase
-                    .from("drink_products")
-                    .update(updates)
-                    .eq("id", productId);
-                  if (error) {
-                    setSaveError(error.message || "Failed to update product.");
-                  } else {
-                    // Optional: update packaging too when editing (simple approach: delete+insert)
-                    const { error: delErr } = await supabase
-                      .from("drink_products_packaging")
-                      .delete()
-                      .eq("product_id", productId);
-                    if (delErr) {
-                      setSaveError(
-                        delErr.message || "Failed to update packaging."
-                      );
-                      return;
-                    }
-                    const packagingRows = packaging
-                      .filter(isPackagingComplete)
-                      .map((p) => {
-                        const priceRaw = (p.price || "").trim();
-                        const priceParsed = priceRaw
-                          ? Number.parseFloat(priceRaw.replace(/[^0-9.]/g, ""))
-                          : NaN;
-                        const priceValue = Number.isFinite(priceParsed)
-                          ? Number(priceParsed.toFixed(2))
-                          : null;
-                        return {
-                          product_id: productId,
-                          units_per_case: parseInt(p.caseSize, 10),
-                          unit_volume: parseFloat(p.unitSize),
-                          measure_type: p.measureType,
-                          unit_type: p.unitType,
-                          price: priceValue as number | null,
-                          vendor_id: p.vendorId || null,
-                          notes: null as string | null,
-                        };
-                      });
-                    if (packagingRows.length > 0) {
-                      const { error: insErr } = await supabase
-                        .from("drink_products_packaging")
-                        .insert(packagingRows);
-                      if (insErr) {
-                        setSaveError(
-                          insErr.message || "Failed to update packaging."
-                        );
-                        return;
-                      }
-                    }
-                    onClose();
-                    if (onSaved) {
-                      onSaved();
-                    }
-                  }
-                }
-              } finally {
-                setSaving(false);
-              }
-            }}
-          >
-            {saving ? (
-              <>Saving…</>
-            ) : (
-              <>
+        <div className="px-5 py-4 border-t border-gray-100 flex items-center justify-between gap-3">
+          <div className="flex items-center">
+            {productId ? (
+              <button
+                type="button"
+                className="inline-flex items-center gap-2 rounded-md bg-red-50 px-3 py-2 text-sm font-medium text-red-700 hover:bg-red-100 focus:outline-none focus:ring-2 focus:ring-red-200"
+                onClick={() => setDeleteConfirmOpen(true)}
+                disabled={saving || deleting}
+              >
                 <svg
                   className="h-4 w-4"
                   viewBox="0 0 24 24"
@@ -1193,12 +1021,219 @@ export default function DrinkProductDrawer({
                   stroke="currentColor"
                   strokeWidth="2"
                 >
-                  <path d="M5 13l4 4L19 7" />
+                  <path d="M3 6h18" />
+                  <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" />
+                  <path d="M10 11v6" />
+                  <path d="M14 11v6" />
+                  <path d="M9 6V4a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v2" />
                 </svg>
-                Save
-              </>
-            )}
-          </button>
+                Delete
+              </button>
+            ) : null}
+          </div>
+          <div className="flex items-center gap-3">
+            <button
+              type="button"
+              className="rounded-md px-3 py-2 text-sm bg-gray-100 text-gray-800 hover:bg-gray-200"
+              onClick={onClose}
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              className={`inline-flex items-center gap-2 rounded-md px-3 py-2 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-[var(--oe-green)]/60 ${
+                saving ||
+                !name.trim() ||
+                !businessId ||
+                (!productId && !allPackagingComplete)
+                  ? "bg-gray-300 text-gray-700 cursor-not-allowed"
+                  : "bg-[var(--oe-green)] text-black hover:opacity-90"
+              }`}
+              disabled={
+                saving ||
+                !name.trim() ||
+                !businessId ||
+                (!productId && !allPackagingComplete)
+              }
+              onClick={async () => {
+                if (!name.trim()) {
+                  setSaveError("Product name is required");
+                  return;
+                }
+                if (!businessId) {
+                  setSaveError("Missing business context.");
+                  return;
+                }
+                if (!productId && !allPackagingComplete) {
+                  setSaveError("Please complete all packaging fields.");
+                  return;
+                }
+                setSaveError(null);
+                setSaving(true);
+                try {
+                  const priceValueRaw = price.trim();
+                  const priceParsed = priceValueRaw
+                    ? Number.parseFloat(priceValueRaw.replace(/[^0-9.]/g, ""))
+                    : NaN;
+                  const priceValue = Number.isFinite(priceParsed)
+                    ? priceParsed
+                    : null;
+                  if (!productId) {
+                    const row = {
+                      business_id: businessId,
+                      name: name.trim(),
+                      brand_name: null as string | null,
+                      category: category.trim() || null,
+                      subcategory: subcategory.trim() || null,
+                      category_id: categoryId || null,
+                      subcategory_id: subcategoryId || null,
+                      vendor: vendor.trim() || null,
+                      sku: sku.trim() || null,
+                      price: priceValue as number | null,
+                      notes: notes.trim() || null,
+                    };
+                    const { data: inserted, error } = await supabase
+                      .from("drink_products")
+                      .insert([row])
+                      .select("id")
+                      .single();
+                    if (error) {
+                      setSaveError(error.message || "Failed to save product.");
+                    } else if (inserted?.id) {
+                      const packagingRows = packaging
+                        .filter(isPackagingComplete)
+                        .map((p) => {
+                          const priceRaw = (p.price || "").trim();
+                          const priceParsed = priceRaw
+                            ? Number.parseFloat(
+                                priceRaw.replace(/[^0-9.]/g, "")
+                              )
+                            : NaN;
+                          const priceValue = Number.isFinite(priceParsed)
+                            ? Number(priceParsed.toFixed(2))
+                            : null;
+                          return {
+                            product_id: inserted.id,
+                            units_per_case: parseInt(p.caseSize, 10),
+                            unit_volume: parseFloat(p.unitSize),
+                            measure_type: p.measureType,
+                            unit_type: p.unitType,
+                            price: priceValue as number | null,
+                            vendor_id: p.vendorId || null,
+                            notes: null as string | null,
+                          };
+                        });
+                      if (packagingRows.length > 0) {
+                        const { error: pkgError } = await supabase
+                          .from("drink_products_packaging")
+                          .insert(packagingRows);
+                        if (pkgError) {
+                          setSaveError(
+                            pkgError.message || "Failed to save packaging."
+                          );
+                          return;
+                        }
+                      }
+                      onClose();
+                      if (onSaved) {
+                        onSaved();
+                      }
+                    }
+                  } else {
+                    const updates = {
+                      name: name.trim(),
+                      category: category.trim() || null,
+                      subcategory: subcategory.trim() || null,
+                      category_id: categoryId || null,
+                      subcategory_id: subcategoryId || null,
+                      vendor: vendor.trim() || null,
+                      sku: sku.trim() || null,
+                      price: priceValue as number | null,
+                      notes: notes.trim() || null,
+                    };
+                    const { error } = await supabase
+                      .from("drink_products")
+                      .update(updates)
+                      .eq("id", productId);
+                    if (error) {
+                      setSaveError(
+                        error.message || "Failed to update product."
+                      );
+                    } else {
+                      // Optional: update packaging too when editing (simple approach: delete+insert)
+                      const { error: delErr } = await supabase
+                        .from("drink_products_packaging")
+                        .delete()
+                        .eq("product_id", productId);
+                      if (delErr) {
+                        setSaveError(
+                          delErr.message || "Failed to update packaging."
+                        );
+                        return;
+                      }
+                      const packagingRows = packaging
+                        .filter(isPackagingComplete)
+                        .map((p) => {
+                          const priceRaw = (p.price || "").trim();
+                          const priceParsed = priceRaw
+                            ? Number.parseFloat(
+                                priceRaw.replace(/[^0-9.]/g, "")
+                              )
+                            : NaN;
+                          const priceValue = Number.isFinite(priceParsed)
+                            ? Number(priceParsed.toFixed(2))
+                            : null;
+                          return {
+                            product_id: productId,
+                            units_per_case: parseInt(p.caseSize, 10),
+                            unit_volume: parseFloat(p.unitSize),
+                            measure_type: p.measureType,
+                            unit_type: p.unitType,
+                            price: priceValue as number | null,
+                            vendor_id: p.vendorId || null,
+                            notes: null as string | null,
+                          };
+                        });
+                      if (packagingRows.length > 0) {
+                        const { error: insErr } = await supabase
+                          .from("drink_products_packaging")
+                          .insert(packagingRows);
+                        if (insErr) {
+                          setSaveError(
+                            insErr.message || "Failed to update packaging."
+                          );
+                          return;
+                        }
+                      }
+                      onClose();
+                      if (onSaved) {
+                        onSaved();
+                      }
+                    }
+                  }
+                } finally {
+                  setSaving(false);
+                }
+              }}
+            >
+              {saving ? (
+                <>Saving…</>
+              ) : (
+                <>
+                  <svg
+                    className="h-4 w-4"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                  >
+                    <path d="M5 13l4 4L19 7" />
+                  </svg>
+                  Save
+                </>
+              )}
+            </button>
+          </div>
         </div>
       </div>
       <ManageDrinkCategoriesModal
@@ -1295,6 +1330,32 @@ export default function DrinkProductDrawer({
           setPkgToDelete(null);
           setPkgConfirmOpen(false);
         }}
+      />
+      <ConfirmModal
+        isOpen={deleteConfirmOpen}
+        title="Delete product?"
+        message="This will delete the product and all associated packaging."
+        confirmLabel={deleting ? "Deleting…" : "Delete"}
+        onConfirm={async () => {
+          if (!productId) return;
+          setDeleting(true);
+          try {
+            const { error } = await supabase
+              .from("drink_products")
+              .delete()
+              .eq("id", productId);
+            if (error) {
+              setSaveError(error.message || "Failed to delete product.");
+              return;
+            }
+            setDeleteConfirmOpen(false);
+            onClose();
+            if (onSaved) onSaved();
+          } finally {
+            setDeleting(false);
+          }
+        }}
+        onClose={() => setDeleteConfirmOpen(false)}
       />
     </>
   );
