@@ -114,16 +114,24 @@ export default function PackagingItems({
                 Units per case
               </label>
               <input
-                className="mt-1 w-full rounded-lg bg-gray-50 border border-transparent px-3 py-2 text-sm focus:border-[var(--oe-green)]/40 focus:ring-2 focus:ring-[var(--oe-green)]/30 outline-none"
-                placeholder="e.g., 12"
+                className="mt-1 w-full rounded-lg bg-gray-50 border border-transparent px-3 py-2 text-sm focus:border-[var(--oe-green)]/40 focus:ring-2 focus:ring-[var(--oe-green)]/30 outline-none placeholder:italic"
+                placeholder="optional"
+                inputMode="numeric"
+                pattern="[0-9]*"
                 value={pkg.caseSize}
-                onChange={(e) =>
+                onChange={(e) => {
+                  const raw = e.target.value;
+                  let sanitized = raw.replace(/\D/g, "");
+                  if (sanitized !== "") {
+                    const num = parseInt(sanitized, 10);
+                    if (Number.isFinite(num) && num > 99) sanitized = "99";
+                  }
                   setPackaging((prev) =>
                     prev.map((p) =>
-                      p.id === pkg.id ? { ...p, caseSize: e.target.value } : p
+                      p.id === pkg.id ? { ...p, caseSize: sanitized } : p
                     )
-                  )
-                }
+                  );
+                }}
               />
             </div>
             <div className="col-span-3">
@@ -133,14 +141,30 @@ export default function PackagingItems({
               <input
                 className="mt-1 w-full rounded-lg bg-gray-50 border border-transparent px-3 py-2 text-sm focus:border-[var(--oe-green)]/40 focus:ring-2 focus:ring-[var(--oe-green)]/30 outline-none"
                 placeholder="e.g., 750"
+                inputMode="decimal"
+                pattern="[0-9]*[.]?[0-9]*"
                 value={pkg.unitSize}
-                onChange={(e) =>
+                onChange={(e) => {
+                  const raw = e.target.value;
+                  let sanitized = raw.replace(/[^0-9.]/g, "");
+                  // allow only one decimal point
+                  const firstDot = sanitized.indexOf(".");
+                  if (firstDot !== -1) {
+                    sanitized =
+                      sanitized.slice(0, firstDot + 1) +
+                      sanitized.slice(firstDot + 1).replace(/\./g, "");
+                  }
+                  // cap to 10000
+                  const num = parseFloat(sanitized);
+                  if (Number.isFinite(num) && num > 10000) {
+                    sanitized = "10000";
+                  }
                   setPackaging((prev) =>
                     prev.map((p) =>
-                      p.id === pkg.id ? { ...p, unitSize: e.target.value } : p
+                      p.id === pkg.id ? { ...p, unitSize: sanitized } : p
                     )
-                  )
-                }
+                  );
+                }}
               />
             </div>
             <div className="col-span-3">
@@ -235,14 +259,43 @@ export default function PackagingItems({
                 <input
                   className="w-full rounded-lg bg-gray-50 border border-transparent pl-6 pr-28 py-2 text-sm focus:border-[var(--oe-green)]/40 focus:ring-2 focus:ring-[var(--oe-green)]/30 outline-none"
                   placeholder="0.00"
+                  inputMode="decimal"
+                  pattern="[0-9]*[.]?[0-9]*"
                   value={pkg.price || ""}
-                  onChange={(e) =>
+                  onChange={(e) => {
+                    const raw = e.target.value;
+                    let sanitized = raw.replace(/[^0-9.]/g, "");
+                    const firstDot = sanitized.indexOf(".");
+                    if (firstDot !== -1) {
+                      sanitized =
+                        sanitized.slice(0, firstDot + 1) +
+                        sanitized.slice(firstDot + 1).replace(/\./g, "");
+                    }
                     setPackaging((prev) =>
                       prev.map((p) =>
-                        p.id === pkg.id ? { ...p, price: e.target.value } : p
+                        p.id === pkg.id ? { ...p, price: sanitized } : p
                       )
-                    )
-                  }
+                    );
+                  }}
+                  onBlur={(e) => {
+                    const raw = (e.target.value || "").trim();
+                    if (raw === "") return;
+                    const num = Number.parseFloat(raw);
+                    if (Number.isFinite(num)) {
+                      const fixed = (Math.round(num * 100) / 100).toFixed(2);
+                      setPackaging((prev) =>
+                        prev.map((p) =>
+                          p.id === pkg.id ? { ...p, price: fixed } : p
+                        )
+                      );
+                    } else {
+                      setPackaging((prev) =>
+                        prev.map((p) =>
+                          p.id === pkg.id ? { ...p, price: "" } : p
+                        )
+                      );
+                    }
+                  }}
                 />
                 <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-[11px] text-gray-500">
                   {(() => {
@@ -314,9 +367,9 @@ export default function PackagingItems({
               {
                 id: `pkg_${Date.now()}_${Math.random().toString(36).slice(2)}`,
                 caseSize: "",
-                unitSize: "",
-                measureType: "",
-                unitType: "",
+                unitSize: "750",
+                measureType: "mL",
+                unitType: "bottle",
                 price: "",
                 vendorId: "",
               },

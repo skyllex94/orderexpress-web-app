@@ -93,13 +93,29 @@ export default function DrinkProductDrawer({
   const [loadingProduct, setLoadingProduct] = useState<boolean>(false);
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState<boolean>(false);
   const [deleting, setDeleting] = useState<boolean>(false);
+  type OriginalSnapshot = {
+    name: string;
+    sku: string;
+    categoryId: string;
+    subcategoryId: string;
+    notes: string;
+    packaging: Array<{
+      caseSize: string;
+      unitSize: string;
+      measureType: string;
+      unitType: string;
+      price: string;
+      vendorId: string;
+    }>;
+  };
+  const [original, setOriginal] = useState<OriginalSnapshot | null>(null);
   const [packaging, setPackaging] = useState<PackagingForm[]>([
     {
       id: `pkg_${Date.now()}`,
       caseSize: "",
-      unitSize: "",
-      measureType: "",
-      unitType: "",
+      unitSize: "750",
+      measureType: "mL",
+      unitType: "bottle",
       price: "",
       vendorId: "",
     },
@@ -161,12 +177,50 @@ export default function DrinkProductDrawer({
     });
   }, [open, reportingUnitOptions]);
   const isPackagingComplete = (p: PackagingForm) =>
-    p.caseSize.trim().length > 0 &&
     p.unitSize.trim().length > 0 &&
     p.measureType.trim().length > 0 &&
     p.unitType.trim().length > 0;
-  const allPackagingComplete =
-    packaging.length > 0 && packaging.every(isPackagingComplete);
+  const firstPackagingComplete =
+    packaging.length > 0 && isPackagingComplete(packaging[0]);
+
+  // Compute dirty flag for edit mode by comparing current state to original snapshot
+  const editDirty = useMemo(() => {
+    if (!productId || !original) return false;
+    if (
+      name.trim() !== original.name ||
+      sku.trim() !== original.sku ||
+      categoryId !== original.categoryId ||
+      subcategoryId !== original.subcategoryId ||
+      notes.trim() !== original.notes
+    ) {
+      return true;
+    }
+    if (packaging.length !== original.packaging.length) return true;
+    for (let i = 0; i < packaging.length; i++) {
+      const cur = packaging[i];
+      const orig = original.packaging[i];
+      if (
+        (cur.caseSize || "").trim() !== (orig.caseSize || "").trim() ||
+        (cur.unitSize || "").trim() !== (orig.unitSize || "").trim() ||
+        (cur.measureType || "").trim() !== (orig.measureType || "").trim() ||
+        (cur.unitType || "").trim() !== (orig.unitType || "").trim() ||
+        (cur.price || "").trim() !== (orig.price || "").trim() ||
+        (cur.vendorId || "").trim() !== (orig.vendorId || "").trim()
+      ) {
+        return true;
+      }
+    }
+    return false;
+  }, [
+    productId,
+    original,
+    name,
+    sku,
+    categoryId,
+    subcategoryId,
+    notes,
+    packaging,
+  ]);
 
   useEffect(() => {
     function onEsc(e: KeyboardEvent) {
@@ -193,6 +247,18 @@ export default function DrinkProductDrawer({
           isDefault: true,
         },
       ]);
+      setPackaging([
+        {
+          id: `pkg_${Date.now()}`,
+          caseSize: "",
+          unitSize: "750",
+          measureType: "mL",
+          unitType: "bottle",
+          price: "",
+          vendorId: "",
+        },
+      ]);
+      setOriginal(null);
     }
   }, [open, reportingUnitOptions]);
 
@@ -252,6 +318,24 @@ export default function DrinkProductDrawer({
           },
         ]);
       }
+      // Capture original snapshot after state is set (next tick)
+      setTimeout(() => {
+        setOriginal({
+          name: String(data.name || ""),
+          sku: String(data.sku || ""),
+          categoryId: String(data.category_id || ""),
+          subcategoryId: String(data.subcategory_id || ""),
+          notes: String(data.notes || ""),
+          packaging: (pkgRows || []).map((r) => ({
+            caseSize: r.units_per_case != null ? String(r.units_per_case) : "",
+            unitSize: r.unit_volume != null ? String(r.unit_volume) : "",
+            measureType: String(r.measure_type || ""),
+            unitType: String(r.unit_type || ""),
+            price: r.price != null ? String(r.price) : "",
+            vendorId: r.vendor_id != null ? String(r.vendor_id) : "",
+          })),
+        });
+      }, 0);
       setLoadingProduct(false);
     }
     loadProduct();
@@ -275,9 +359,9 @@ export default function DrinkProductDrawer({
         {
           id: `pkg_${Date.now()}`,
           caseSize: "",
-          unitSize: "",
-          measureType: "",
-          unitType: "",
+          unitSize: "750",
+          measureType: "mL",
+          unitType: "bottle",
           price: "",
           vendorId: "",
         },
@@ -708,7 +792,8 @@ export default function DrinkProductDrawer({
               saving ||
               !name.trim() ||
               !businessId ||
-              (!productId && !allPackagingComplete)
+              (!productId && !firstPackagingComplete) ||
+              (productId && !editDirty)
             )
           }
           onCancel={onClose}
@@ -722,8 +807,8 @@ export default function DrinkProductDrawer({
               setSaveError("Missing business context.");
               return;
             }
-            if (!productId && !allPackagingComplete) {
-              setSaveError("Please complete all packaging fields.");
+            if (!productId && !firstPackagingComplete) {
+              setSaveError("Please complete the first packaging fields.");
               return;
             }
             setSaveError(null);
@@ -763,7 +848,9 @@ export default function DrinkProductDrawer({
                         : null;
                       return {
                         product_id: inserted.id,
-                        units_per_case: parseInt(p.caseSize, 10),
+                        units_per_case: p.caseSize.trim()
+                          ? parseInt(p.caseSize, 10)
+                          : null,
                         unit_volume: parseFloat(p.unitSize),
                         measure_type: p.measureType,
                         unit_type: p.unitType,
@@ -830,7 +917,9 @@ export default function DrinkProductDrawer({
                         : null;
                       return {
                         product_id: productId,
-                        units_per_case: parseInt(p.caseSize, 10),
+                        units_per_case: p.caseSize.trim()
+                          ? parseInt(p.caseSize, 10)
+                          : null,
                         unit_volume: parseFloat(p.unitSize),
                         measure_type: p.measureType,
                         unit_type: p.unitType,
@@ -850,6 +939,22 @@ export default function DrinkProductDrawer({
                       return;
                     }
                   }
+                  // Refresh original snapshot and close
+                  setOriginal({
+                    name: name.trim(),
+                    sku: sku.trim(),
+                    categoryId: categoryId || "",
+                    subcategoryId: subcategoryId || "",
+                    notes: notes.trim(),
+                    packaging: packaging.map((p) => ({
+                      caseSize: (p.caseSize || "").trim(),
+                      unitSize: (p.unitSize || "").trim(),
+                      measureType: (p.measureType || "").trim(),
+                      unitType: (p.unitType || "").trim(),
+                      price: (p.price || "").trim(),
+                      vendorId: (p.vendorId || "").trim(),
+                    })),
+                  });
                   onClose();
                   if (onSaved) {
                     onSaved();
