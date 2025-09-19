@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { useDebouncedValue } from "../hooks/useDebouncedValue";
 import { useLocation, useNavigate } from "react-router-dom";
 import { supabase } from "../services/supabase";
 import ConfirmModal from "../components/ConfirmModal";
@@ -85,6 +86,9 @@ export default function Dashboard() {
   >(null);
   const [drinksRefreshKey, setDrinksRefreshKey] = useState<number>(0);
   const [drinkSearch, setDrinkSearch] = useState<string>("");
+  const debouncedDrinkSearch = useDebouncedValue(drinkSearch, 250);
+  const isDrinkDrawerOpen =
+    active === "products" && productsSection === "drink" && drinkDrawerOpen;
 
   const activeLabel: string =
     active === "settings"
@@ -997,7 +1001,7 @@ export default function Dashboard() {
                     setEditingDrinkProductId(id);
                     setDrinkDrawerOpen(true);
                   }}
-                  searchQuery={drinkSearch}
+                  searchQuery={debouncedDrinkSearch}
                 />
               )}
               {productsSection === "categories" && <ProductsCategories />}
@@ -1543,21 +1547,19 @@ export default function Dashboard() {
         </div>
       </div>
 
-      {/* Right-side Drink Product Drawer */}
-      <DrinkProductDrawer
-        open={
-          active === "products" &&
-          productsSection === "drink" &&
-          drinkDrawerOpen
-        }
-        onClose={() => setDrinkDrawerOpen(false)}
-        businessId={businessId}
-        productId={editingDrinkProductId}
-        onSaved={() => {
-          setDrinksRefreshKey((k) => k + 1);
-          setEditingDrinkProductId(null);
-        }}
-      />
+      {/* Right-side Drink Product Drawer (mount only when open) */}
+      {isDrinkDrawerOpen && (
+        <DrinkProductDrawer
+          open={true}
+          onClose={() => setDrinkDrawerOpen(false)}
+          businessId={businessId}
+          productId={editingDrinkProductId}
+          onSaved={() => {
+            setDrinksRefreshKey((k) => k + 1);
+            setEditingDrinkProductId(null);
+          }}
+        />
+      )}
       <ConfirmModal
         isOpen={switchConfirmOpen}
         title="Switch business?"

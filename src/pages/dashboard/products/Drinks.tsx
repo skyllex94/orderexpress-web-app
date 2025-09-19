@@ -98,15 +98,15 @@ export default function ProductsDrinks({
             if (nm && nm.trim().length > 0) vendorNames.add(nm.trim());
           }
           const vendorList = Array.from(vendorNames).join(", ") || "-";
-          // Compute price display from first packaging (by created_at asc if available)
+          // Compute price display from earliest packaging (by created_at, linear scan)
           let priceDisplay = "-";
           if (pkgs.length > 0) {
-            const sorted = [...pkgs].sort((a, b) => {
-              const aa = a.created_at || "";
-              const bb = b.created_at || "";
-              return aa < bb ? -1 : aa > bb ? 1 : 0;
-            });
-            const first = sorted[0];
+            const first = pkgs.reduce((best, cur) => {
+              if (!best) return cur;
+              const aa = best.created_at || "";
+              const bb = cur.created_at || "";
+              return bb < aa ? cur : best;
+            }, pkgs[0] as (typeof pkgs)[number] | null);
             if (first && first.price != null) {
               const rawPrice: unknown = first.price as unknown;
               const priceNum =
