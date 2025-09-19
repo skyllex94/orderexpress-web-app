@@ -5,9 +5,11 @@ type UIProductRow = {
   id: string;
   name: string;
   category: string;
+  subcategory?: string;
   vendor: string;
-  measuringUnit: string; // e.g., "750 mL bottle"
-  cost: string; // display-ready, e.g., "$24.00"
+  sku?: string;
+  price: string; // display-ready, e.g., "$24.00 / 12 x 750mL (bottles)"
+  notes?: string;
 };
 
 export default function ProductsDrinks({
@@ -50,29 +52,37 @@ export default function ProductsDrinks({
       setLoading(true);
       setError(null);
       try {
-        // Fetch products plus packaging vendors; dedupe vendors per product
+        // Fetch products plus packaging vendors and pricing; dedupe vendors per product
         type PackagingRow = {
-          vendor_id: string | null;
+          units_per_case: number | null;
+          unit_volume: number | null;
+          measure_type: string | null;
+          unit_type: string | null;
+          price: number | null;
+          created_at: string | null;
           vendors: { name: string | null } | null;
         };
         type ProductRow = {
           id: string;
           name: string | null;
           category: string | null;
+          subcategory: string | null;
+          sku: string | null;
+          notes: string | null;
           drink_products_packaging: PackagingRow[] | null;
         };
         const { data, error: err } = await supabase
           .from("drink_products")
           .select(
-            "id, name, category, drink_products_packaging(vendor_id, vendors(name))"
+            "id, name, category, subcategory, sku, notes, drink_products_packaging(units_per_case, unit_volume, measure_type, unit_type, price, created_at, vendors(name))"
           )
           .eq("business_id", businessId)
           .order("created_at", { ascending: false });
         if (err) throw err;
         if (!mounted) return;
-        const rows: ProductRow[] = (data || []) as unknown as ProductRow[];
-        const mapped: UIProductRow[] = rows.map((r) => {
-          // Collect vendor names from packaging->vendors
+        const rowsData: ProductRow[] = (data || []) as unknown as ProductRow[];
+        const mapped: UIProductRow[] = rowsData.map((r) => {
+          // Vendors list from packaging
           const vendorNames = new Set<string>();
           const pkgs: PackagingRow[] = Array.isArray(r.drink_products_packaging)
             ? (r.drink_products_packaging as PackagingRow[])
@@ -82,13 +92,51 @@ export default function ProductsDrinks({
             if (nm && nm.trim().length > 0) vendorNames.add(nm.trim());
           }
           const vendorList = Array.from(vendorNames).join(", ") || "-";
+          // Compute price display from first packaging (by created_at asc if available)
+          let priceDisplay = "-";
+          if (pkgs.length > 0) {
+            const sorted = [...pkgs].sort((a, b) => {
+              const aa = a.created_at || "";
+              const bb = b.created_at || "";
+              return aa < bb ? -1 : aa > bb ? 1 : 0;
+            });
+            const first = sorted[0];
+            if (first && first.price != null) {
+              const rawPrice: unknown = first.price as unknown;
+              const priceNum =
+                typeof rawPrice === "number" ? rawPrice : Number(rawPrice);
+              if (!Number.isFinite(priceNum)) {
+                // leave as '-'
+              } else {
+                const units =
+                  first.units_per_case != null
+                    ? Number(first.units_per_case)
+                    : null;
+                const perUnit =
+                  units && Number.isFinite(units) && units > 0
+                    ? priceNum / units
+                    : priceNum;
+                const perVal = perUnit.toFixed(2);
+                const unit = (first.unit_type || "").trim();
+                const unitLabel = unit || "unit";
+                const unitSz =
+                  first.unit_volume != null ? String(first.unit_volume) : "";
+                const measure = (first.measure_type || "").trim();
+                const hasSize = unitSz.length > 0 && measure.length > 0;
+                const sizePart = hasSize ? ` (${unitSz}${measure})` : "";
+                priceDisplay = `$${perVal}/${unitLabel}${sizePart}`;
+              }
+            }
+          }
           return {
             id: r.id,
             name: r.name || "Untitled",
             category: r.category || "-",
+            subcategory: r.subcategory || undefined,
             vendor: vendorList,
-            measuringUnit: "-",
-            cost: "-",
+            sku: r.sku || "",
+            price: priceDisplay,
+            notes: r.notes || undefined,
           };
         });
         setProducts(mapped);
@@ -175,10 +223,10 @@ export default function ProductsDrinks({
                   Vendor
                 </th>
                 <th className="px-2 sm:px-3 py-3 font-medium min-w-[120px] hidden lg:table-cell">
-                  Measuring Unit
+                  SKU
                 </th>
-                <th className="px-3 sm:px-6 py-3 font-medium text-right min-w-[80px]">
-                  Cost
+                <th className="px-3 sm:px-6 py-3 font-medium text-right min-w-[120px]">
+                  Price
                 </th>
               </tr>
             </thead>
@@ -206,8 +254,9 @@ export default function ProductsDrinks({
               )}
               {!loading &&
                 rows.length > 0 &&
-                rows.map((p) => {
+                rows.map((p, idx) => {
                   const checked = selectedIds.has(p.id);
+                  const isLast = idx === rows.length - 1;
                   return (
                     <tr
                       key={p.id}
@@ -223,37 +272,83 @@ export default function ProductsDrinks({
                         />
                       </td>
                       <td className="px-2 sm:px-3 py-3 align-middle">
-                        <button
-                          type="button"
-                          className="text-sm font-medium text-[var(--oe-black)] hover:underline"
-                          onClick={() => onOpenProduct(p.id)}
-                        >
-                          {p.name}
-                        </button>
+                        <div className="flex items-center gap-2">
+                          <button
+                            type="button"
+                            className="text-sm font-medium text-[var(--oe-black)] hover:underline"
+                            onClick={() => onOpenProduct(p.id)}
+                          >
+                            {p.name}
+                          </button>
+                          {p.notes && (
+                            <div className="relative group">
+                              <svg
+                                className="h-4 w-4 text-gray-500"
+                                viewBox="0 0 24 24"
+                                fill="none"
+                                stroke="currentColor"
+                                strokeWidth="2"
+                              >
+                                <rect
+                                  x="4"
+                                  y="3"
+                                  width="16"
+                                  height="18"
+                                  rx="2"
+                                  ry="2"
+                                />
+                                <path d="M8 7h8" />
+                                <path d="M8 11h8" />
+                                <path d="M8 15h5" />
+                              </svg>
+                              <div
+                                className={`pointer-events-none absolute left-1/2 z-50 hidden -translate-x-1/2 whitespace-pre-wrap rounded-md bg-white px-3 py-2 text-sm text-[var(--oe-black)] ring-1 ring-gray-200 shadow-md group-hover:block min-w-[160px] max-w-[320px] ${
+                                  isLast
+                                    ? "bottom-full -translate-y-2"
+                                    : "top-full translate-y-2"
+                                }`}
+                              >
+                                {p.notes}
+                              </div>
+                            </div>
+                          )}
+                        </div>
                         <div className="sm:hidden mt-1 grid grid-cols-2 gap-x-2 gap-y-1 text-xs text-gray-600">
                           <div className="font-medium">Category:</div>
-                          <div>{p.category}</div>
+                          <div>
+                            <div>{p.category}</div>
+                            {p.subcategory ? (
+                              <div className="text-[11px] text-gray-500 mt-0.5">
+                                {p.subcategory}
+                              </div>
+                            ) : null}
+                          </div>
                           <div className="font-medium">Vendor:</div>
                           <div>{p.vendor}</div>
-                          <div className="font-medium">Measuring Unit:</div>
-                          <div>{p.measuringUnit}</div>
+                          <div className="font-medium">SKU:</div>
+                          <div>{p.sku || ""}</div>
                         </div>
                       </td>
                       <td className="px-2 sm:px-3 py-3 align-middle hidden sm:table-cell">
                         <div className="text-sm text-gray-700">
                           {p.category}
                         </div>
+                        {p.subcategory ? (
+                          <div className="text-[11px] text-gray-500 mt-0.5">
+                            {p.subcategory}
+                          </div>
+                        ) : null}
                       </td>
                       <td className="px-2 sm:px-3 py-3 align-middle hidden md:table-cell">
                         <div className="text-sm text-gray-700">{p.vendor}</div>
                       </td>
                       <td className="px-2 sm:px-3 py-3 align-middle hidden lg:table-cell">
                         <div className="text-sm text-gray-700">
-                          {p.measuringUnit}
+                          {p.sku || ""}
                         </div>
                       </td>
                       <td className="px-3 sm:px-6 py-3 align-middle text-right">
-                        <div className="text-sm text-gray-900">{p.cost}</div>
+                        <div className="text-sm text-gray-900">{p.price}</div>
                       </td>
                     </tr>
                   );
