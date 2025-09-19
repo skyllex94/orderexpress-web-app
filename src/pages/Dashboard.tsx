@@ -1029,7 +1029,9 @@ export default function Dashboard() {
                   onCloseAddVendor={() => setAddVendorOpen(false)}
                 />
               )}
-              {orderingSection === "cart" && <OrderingCart />}
+              {orderingSection === "cart" && (
+                <OrderingCart businessId={businessId} />
+              )}
             </>
           )}
           {active === "analytics" && <Analytics />}
