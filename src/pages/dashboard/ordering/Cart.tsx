@@ -61,62 +61,72 @@ export default function OrderingCart({ businessId }: { businessId: string }) {
           .eq("business_id", businessId);
         if (err) throw err;
         const rows = (data || []) as unknown as ProductRow[];
-        const mapped = rows.map((r) => {
+        const mapped = rows.flatMap((r) => {
           const pkgs: PackagingRow[] = Array.isArray(r.drink_products_packaging)
             ? (r.drink_products_packaging as PackagingRow[])
             : [];
-          // Choose earliest packaging row for vendor assignment
-          let chosenName: string = "";
-          if (pkgs.length > 0) {
-            const first = pkgs.reduce((best, cur) => {
-              if (!best) return cur;
-              const aa = best.created_at || "";
-              const bb = cur.created_at || "";
-              return bb < aa ? cur : best;
-            }, pkgs[0] as PackagingRow | null);
-            const nm = first?.vendors?.name || null;
-            if (nm && nm.trim().length > 0) chosenName = nm.trim();
+          const vendorToPkgs = new Map<string, PackagingRow[]>();
+          for (const p of pkgs) {
+            const nmRaw = (p?.vendors?.name || r.vendor || "").trim();
+            const nm = nmRaw.length > 0 ? nmRaw : "Other";
+            const arr = vendorToPkgs.get(nm) || [];
+            arr.push(p);
+            vendorToPkgs.set(nm, arr);
           }
-          if (!chosenName) chosenName = (r.vendor || "").trim();
-          if (!chosenName) chosenName = "Other";
-          const uiPackaging: UIPackaging[] = pkgs.map((p, idx) => {
-            const units =
-              p.units_per_case != null ? Number(p.units_per_case) : null;
-            const volume = p.unit_volume != null ? String(p.unit_volume) : "";
-            const measure = (p.measure_type || "").trim();
-            const unit = (p.unit_type || "").trim();
-            const unitPlural = (() => {
-              const map: Record<string, string> = {
-                bottle: "bottles",
-                can: "cans",
-                "can(food)": "cans",
-                keg: "kegs",
-                bag: "bags",
-                box: "boxes",
-                carton: "cartons",
-                container: "containers",
-                package: "packages",
-                other: "units",
+          if (vendorToPkgs.size === 0) {
+            // No packaging rows with vendor; make a single entry under fallback vendor
+            const fallback = (r.vendor || "Other").trim() || "Other";
+            vendorToPkgs.set(fallback, []);
+          }
+          const entries: {
+            id: string;
+            name: string;
+            vendor: string;
+            packaging: UIPackaging[];
+          }[] = [];
+          vendorToPkgs.forEach((pkgRows, vendorName) => {
+            const uiPackaging: UIPackaging[] = pkgRows.map((p, idx) => {
+              const units =
+                p.units_per_case != null ? Number(p.units_per_case) : null;
+              const volume = p.unit_volume != null ? String(p.unit_volume) : "";
+              const measure = (p.measure_type || "").trim();
+              const unit = (p.unit_type || "").trim();
+              const unitPlural = (() => {
+                const map: Record<string, string> = {
+                  bottle: "bottles",
+                  can: "cans",
+                  "can(food)": "cans",
+                  keg: "kegs",
+                  bag: "bags",
+                  box: "boxes",
+                  carton: "cartons",
+                  container: "containers",
+                  package: "packages",
+                  other: "units",
+                };
+                return map[unit] || (unit ? `${unit}s` : "units");
+              })();
+              const sizePart = volume && measure ? `${volume}${measure}` : "";
+              const label =
+                units && units > 0
+                  ? `${units} x ${sizePart} (${unitPlural})`
+                  : `${sizePart} (${unit})`;
+              return {
+                id: String(p.id || `${r.id}_pkg_${idx}`),
+                label,
+                price: p.price != null ? Number(p.price) : null,
               };
-              return map[unit] || (unit ? `${unit}s` : "units");
-            })();
-            const sizePart = volume && measure ? `${volume}${measure}` : "";
-            const label =
-              units && units > 0
-                ? `${units} x ${sizePart} (${unitPlural})`
-                : `${sizePart} (${unit})`;
-            return {
-              id: String(p.id || `${r.id}_pkg_${idx}`),
-              label,
-              price: p.price != null ? Number(p.price) : null,
-            };
+            });
+            const vendorSlug =
+              vendorName.toLowerCase().replace(/[^a-z0-9]+/g, "-") || "other";
+            entries.push({
+              id: `${r.id}__${vendorSlug}`,
+              name: r.name || "Untitled",
+              vendor: vendorName,
+              packaging: uiPackaging,
+            });
           });
-          return {
-            id: r.id,
-            name: r.name || "Untitled",
-            vendor: chosenName,
-            packaging: uiPackaging,
-          };
+          return entries;
         });
         if (!mounted) return;
         setProducts(mapped);
@@ -145,9 +155,22 @@ export default function OrderingCart({ businessId }: { businessId: string }) {
   }, [businessId]);
 
   // Build vendor groups from products list
-  const vendors: VendorGroup[] = useMemo(() => {
+  // Full vendor list (unused after filtering) removed
+
+  // Filter products first (by product name OR vendor), then rebuild vendor groups
+  const filteredProducts = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    if (!q) return products;
+    return products.filter(
+      (p) =>
+        p.name.toLowerCase().includes(q) ||
+        (p.vendor || "").toLowerCase().includes(q)
+    );
+  }, [products, search]);
+
+  const filteredVendors: VendorGroup[] = useMemo(() => {
     const counts = new Map<string, number>();
-    for (const p of products) {
+    for (const p of filteredProducts) {
       const key = p.vendor || "Other";
       counts.set(key, (counts.get(key) || 0) + 1);
     }
@@ -158,13 +181,15 @@ export default function OrderingCart({ businessId }: { businessId: string }) {
     }));
     arr.sort((a, b) => a.name.localeCompare(b.name));
     return arr;
-  }, [products]);
+  }, [filteredProducts]);
 
-  const filtered = useMemo(() => {
-    const q = search.trim().toLowerCase();
-    if (!q) return vendors;
-    return vendors.filter((v) => v.name.toLowerCase().includes(q));
-  }, [vendors, search]);
+  // Auto-expand all vendors while searching for quicker scanning
+  useEffect(() => {
+    const q = search.trim();
+    if (q.length > 0) {
+      setExpanded(Object.fromEntries(filteredVendors.map((v) => [v.id, true])));
+    }
+  }, [search, filteredVendors]);
 
   function toggleRow(id: string) {
     setExpanded((prev) => ({ ...prev, [id]: !prev[id] }));
@@ -174,7 +199,7 @@ export default function OrderingCart({ businessId }: { businessId: string }) {
     const next = expandAll === "all" ? "none" : "all";
     setExpandAll(next);
     if (next === "all") {
-      setExpanded(Object.fromEntries(filtered.map((v) => [v.id, true])));
+      setExpanded(Object.fromEntries(filteredVendors.map((v) => [v.id, true])));
     } else {
       setExpanded({});
     }
@@ -321,7 +346,7 @@ export default function OrderingCart({ businessId }: { businessId: string }) {
           {loading && (
             <div className="px-6 py-10 text-sm text-gray-500">Loading…</div>
           )}
-          {filtered.map((v) => {
+          {filteredVendors.map((v) => {
             const isOpen = expanded[v.id] === true;
             return (
               <div key={v.id} className="px-6">
@@ -364,7 +389,7 @@ export default function OrderingCart({ businessId }: { businessId: string }) {
                 </div>
                 {isOpen && (
                   <div className="pb-4 pt-1">
-                    {products
+                    {filteredProducts
                       .filter((p) => p.vendor === v.name)
                       .map((p) => {
                         const pkgIdx = selectedPkgIdx[p.id] ?? 0;
