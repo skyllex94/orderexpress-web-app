@@ -16,10 +16,12 @@ export default function ProductsDrinks({
   businessId,
   onOpenProduct,
   refreshKey,
+  searchQuery,
 }: {
   businessId: string;
   onOpenProduct: (id: string) => void;
   refreshKey?: number;
+  searchQuery?: string;
 }) {
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
@@ -28,7 +30,13 @@ export default function ProductsDrinks({
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const headerCheckboxRef = useRef<HTMLInputElement>(null);
 
-  const total = products.length;
+  const rows = useMemo(() => {
+    const q = (searchQuery || "").trim().toLowerCase();
+    if (!q) return products;
+    return products.filter((p) => p.name.toLowerCase().includes(q));
+  }, [products, searchQuery]);
+
+  const total = rows.length;
   const selectedCount = selectedIds.size;
   const allSelected = selectedCount > 0 && selectedCount === total;
   const someSelected = selectedCount > 0 && selectedCount < total;
@@ -38,8 +46,6 @@ export default function ProductsDrinks({
       headerCheckboxRef.current.indeterminate = someSelected;
     }
   }, [someSelected, selectedCount]);
-
-  const rows = useMemo(() => products, [products]);
 
   useEffect(() => {
     let mounted = true;
@@ -170,7 +176,7 @@ export default function ProductsDrinks({
   function toggleAll() {
     setSelectedIds((prev) => {
       if (prev.size === total) return new Set();
-      return new Set(products.map((p) => p.id));
+      return new Set(rows.map((p) => p.id));
     });
   }
 
@@ -183,7 +189,7 @@ export default function ProductsDrinks({
       <div className="rounded-2xl bg-white shadow-sm ring-1 ring-gray-200 overflow-hidden">
         <div className="px-6 pt-6">
           <h2 className="font-medium text-[var(--oe-black)]">Drink Products</h2>
-          <p className="text-sm text-gray-600">Manage drink items.</p>
+          <p className="mt-1 text-sm text-gray-600">Manage drink items.</p>
         </div>
 
         {selectedCount > 0 && (

@@ -84,6 +84,7 @@ export default function Dashboard() {
     string | null
   >(null);
   const [drinksRefreshKey, setDrinksRefreshKey] = useState<number>(0);
+  const [drinkSearch, setDrinkSearch] = useState<string>("");
 
   const activeLabel: string =
     active === "settings"
@@ -899,6 +900,8 @@ export default function Dashboard() {
                       placeholder="Search drinks…"
                       aria-label="Search drinks"
                       className="w-full rounded-md bg-white/10 border border-[color:var(--oe-border)] pl-9 pr-3 py-2 text-sm placeholder:text-gray-400 text-white focus:outline-none focus:ring-2 focus:ring-[var(--oe-green)]"
+                      value={drinkSearch}
+                      onChange={(e) => setDrinkSearch(e.target.value)}
                     />
                   </div>
                 </div>
@@ -994,6 +997,7 @@ export default function Dashboard() {
                     setEditingDrinkProductId(id);
                     setDrinkDrawerOpen(true);
                   }}
+                  searchQuery={drinkSearch}
                 />
               )}
               {productsSection === "categories" && <ProductsCategories />}
