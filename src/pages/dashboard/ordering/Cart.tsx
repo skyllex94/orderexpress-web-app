@@ -1,5 +1,10 @@
 import { useEffect, useMemo, useState } from "react";
 import { supabase } from "../../../services/supabase";
+import {
+  ShoppingCartIcon,
+  PlusIcon,
+  MinusIcon,
+} from "@heroicons/react/24/solid";
 
 type VendorGroup = {
   id: string;
@@ -26,6 +31,12 @@ export default function OrderingCart({ businessId }: { businessId: string }) {
   const [selectedPkgIdx, setSelectedPkgIdx] = useState<Record<string, number>>(
     {}
   );
+  // Simple in-memory cart keyed by product+vendor+packaging
+  const [cartQtyByKey, setCartQtyByKey] = useState<Record<string, number>>({});
+  const [toast, setToast] = useState<{ visible: boolean; text: string }>({
+    visible: false,
+    text: "",
+  });
   // Load products with their vendor (from earliest packaging row's vendor, else fallback)
   useEffect(() => {
     let mounted = true;
@@ -224,9 +235,37 @@ export default function OrderingCart({ businessId }: { businessId: string }) {
     }
   }
 
+  function addToCart(
+    productId: string,
+    vendorName: string,
+    packagingId: string | undefined,
+    productName: string
+  ) {
+    const key = `${productId}__${vendorName}__${packagingId || "_"}`;
+    setCartQtyByKey((prev) => ({ ...prev, [key]: (prev[key] || 0) + 1 }));
+    setToast({ visible: true, text: `${productName} added to cart` });
+    window.setTimeout(() => setToast({ visible: false, text: "" }), 1500);
+  }
+
+  function inc(productId: string, vendorName: string, packagingId?: string) {
+    const key = `${productId}__${vendorName}__${packagingId || "_"}`;
+    setCartQtyByKey((prev) => ({ ...prev, [key]: (prev[key] || 0) + 1 }));
+  }
+
+  function dec(productId: string, vendorName: string, packagingId?: string) {
+    const key = `${productId}__${vendorName}__${packagingId || "_"}`;
+    setCartQtyByKey((prev) => {
+      const next = { ...prev } as Record<string, number>;
+      const cur = next[key] || 0;
+      if (cur <= 1) delete next[key];
+      else next[key] = cur - 1;
+      return next;
+    });
+  }
+
   return (
     <div className="space-y-6 mt-6">
-      <div className="rounded-2xl bg-white shadow-sm ring-1 ring-gray-200 overflow-hidden">
+      <div className="rounded-2xl bg-white shadow-sm ring-1 ring-gray-200 overflow-hidden relative">
         {/* Top controls */}
         <div className="px-6 pt-6">
           {error && (
@@ -427,7 +466,7 @@ export default function OrderingCart({ businessId }: { businessId: string }) {
                         })();
                         return (
                           <div
-                            key={p.id}
+                            key={`${p.id}-${v.id}`}
                             className="grid grid-cols-12 items-center gap-3 rounded-lg ring-1 ring-gray-200 bg-white px-3 py-3 mb-2 shadow-sm"
                           >
                             <div className="col-span-5">
@@ -483,12 +522,49 @@ export default function OrderingCart({ businessId }: { businessId: string }) {
                               -
                             </div>
                             <div className="col-span-1 text-right">
-                              <input
-                                className="w-20 rounded-md bg-gray-50 border border-transparent px-2 py-1.5 text-sm text-[var(--oe-black)] focus:border-[var(--oe-green)]/40 focus:ring-2 focus:ring-[var(--oe-green)]/30 outline-none text-right"
-                                inputMode="numeric"
-                                pattern="[0-9]*"
-                                placeholder="0"
-                              />
+                              {(() => {
+                                const key = `${p.id}__${v.name}__${
+                                  pkg?.id || "_"
+                                }`;
+                                const qty = cartQtyByKey[key] || 0;
+                                if (qty <= 0) {
+                                  return (
+                                    <button
+                                      type="button"
+                                      onClick={() =>
+                                        addToCart(p.id, v.name, pkg?.id, p.name)
+                                      }
+                                      className="inline-flex items-center gap-2 rounded-md bg-[var(--oe-green)] px-3 py-2 text-sm font-medium text-black hover:opacity-90 focus:outline-none focus:ring-2 focus:ring-[var(--oe-green)]/60"
+                                      aria-label="Add to cart"
+                                    >
+                                      <ShoppingCartIcon className="h-4 w-4" />
+                                    </button>
+                                  );
+                                }
+                                return (
+                                  <div className="inline-flex items-center gap-2">
+                                    <button
+                                      type="button"
+                                      onClick={() => dec(p.id, v.name, pkg?.id)}
+                                      className="rounded-md bg-gray-100 hover:bg-gray-200 p-1 ring-1 ring-gray-200"
+                                      aria-label="Decrease"
+                                    >
+                                      <MinusIcon className="h-5 w-5 text-[var(--oe-black)]" />
+                                    </button>
+                                    <span className="text-sm font-medium text-[var(--oe-black)] min-w-[1.5rem] text-center">
+                                      {qty}
+                                    </span>
+                                    <button
+                                      type="button"
+                                      onClick={() => inc(p.id, v.name, pkg?.id)}
+                                      className="rounded-md bg-gray-100 hover:bg-gray-200 p-1 ring-1 ring-gray-200"
+                                      aria-label="Increase"
+                                    >
+                                      <PlusIcon className="h-5 w-5 text-[var(--oe-black)]" />
+                                    </button>
+                                  </div>
+                                );
+                              })()}
                             </div>
                           </div>
                         );
@@ -506,6 +582,11 @@ export default function OrderingCart({ businessId }: { businessId: string }) {
           })}
         </div>
         <div className="h-2" />
+        {toast.visible && (
+          <div className="pointer-events-none absolute right-4 top-4 z-10 rounded-md bg-black/80 text-white px-3 py-2 text-sm shadow">
+            {toast.text}
+          </div>
+        )}
       </div>
     </div>
   );
