@@ -89,6 +89,20 @@ export default function Dashboard() {
   const debouncedDrinkSearch = useDebouncedValue(drinkSearch, 250);
   const isDrinkDrawerOpen =
     active === "products" && productsSection === "drink" && drinkDrawerOpen;
+  // Keep drawer mounted long enough to play the slide-out animation
+  const [isDrinkDrawerMounted, setIsDrinkDrawerMounted] =
+    useState<boolean>(false);
+  useEffect(() => {
+    let timer: number | undefined;
+    if (isDrinkDrawerOpen) {
+      setIsDrinkDrawerMounted(true);
+    } else if (isDrinkDrawerMounted) {
+      timer = window.setTimeout(() => setIsDrinkDrawerMounted(false), 520);
+    }
+    return () => {
+      if (timer) window.clearTimeout(timer);
+    };
+  }, [isDrinkDrawerOpen, isDrinkDrawerMounted]);
 
   const activeLabel: string =
     active === "settings"
@@ -1548,9 +1562,9 @@ export default function Dashboard() {
       </div>
 
       {/* Right-side Drink Product Drawer (mount only when open) */}
-      {isDrinkDrawerOpen && (
+      {isDrinkDrawerMounted && (
         <DrinkProductDrawer
-          open={true}
+          open={isDrinkDrawerOpen}
           onClose={() => setDrinkDrawerOpen(false)}
           businessId={businessId}
           productId={editingDrinkProductId}

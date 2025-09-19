@@ -22,6 +22,13 @@ export default function DrinkProductDrawer({
   onSaved,
 }: DrinkProductDrawerProps) {
   const overlayRef = useRef<HTMLDivElement>(null);
+  // Animate slide-in on first mount; slide-out when open becomes false
+  const [entered, setEntered] = useState<boolean>(false);
+  useEffect(() => {
+    // defer to next frame to allow transition from off-screen to on-screen
+    const id = requestAnimationFrame(() => setEntered(true));
+    return () => cancelAnimationFrame(id);
+  }, []);
   const [name, setName] = useState("");
   const [sku, setSku] = useState("");
   const [category, setCategory] = useState("");
@@ -458,7 +465,7 @@ export default function DrinkProductDrawer({
         ref={overlayRef}
         onClick={onClose}
         className={`fixed inset-0 z-40 transition-opacity duration-300 ${
-          open
+          open && entered
             ? "opacity-100 pointer-events-auto"
             : "opacity-0 pointer-events-none"
         } bg-black/40`}
@@ -468,7 +475,7 @@ export default function DrinkProductDrawer({
       {/* Right-side Drawer */}
       <div
         className={`fixed inset-y-0 right-0 z-50 w-[40rem] max-w-[96vw] bg-white shadow-2xl ring-1 ring-gray-200 transform transition-transform duration-500 ease-in-out ${
-          open ? "translate-x-0" : "translate-x-full"
+          open && entered ? "translate-x-0" : "translate-x-full"
         } flex h-full flex-col`}
         aria-hidden={!open}
       >
