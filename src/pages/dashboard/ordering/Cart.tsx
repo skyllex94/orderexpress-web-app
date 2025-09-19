@@ -15,8 +15,10 @@ export default function OrderingCart({ businessId }: { businessId: string }) {
   const [error, setError] = useState<string | null>(null);
   type UIPackaging = {
     id: string;
-    label: string; // e.g., "12 x 750mL (bottles)"
+    label: string; // e.g., "case (6 x 750mL bottles)"
     price: number | null; // package price as stored
+    unitsPerCase: number | null;
+    unitSingular: string; // e.g., "bottle"
   };
   const [products, setProducts] = useState<
     { id: string; name: string; vendor: string; packaging: UIPackaging[] }[]
@@ -106,15 +108,32 @@ export default function OrderingCart({ businessId }: { businessId: string }) {
                 };
                 return map[unit] || (unit ? `${unit}s` : "units");
               })();
+              const unitSingular = (() => {
+                const map: Record<string, string> = {
+                  bottle: "bottle",
+                  can: "can",
+                  "can(food)": "can",
+                  keg: "keg",
+                  bag: "bag",
+                  box: "box",
+                  carton: "carton",
+                  container: "container",
+                  package: "package",
+                  other: "unit",
+                };
+                return map[unit] || unit || "unit";
+              })();
               const sizePart = volume && measure ? `${volume}${measure}` : "";
               const label =
                 units && units > 0
-                  ? `${units} x ${sizePart} (${unitPlural})`
-                  : `${sizePart} (${unit})`;
+                  ? `case (${units} x ${sizePart} (${unitPlural}))`
+                  : `${sizePart} ${unitSingular}`;
               return {
                 id: String(p.id || `${r.id}_pkg_${idx}`),
                 label,
                 price: p.price != null ? Number(p.price) : null,
+                unitsPerCase: units,
+                unitSingular,
               };
             });
             const vendorSlug =
@@ -398,6 +417,14 @@ export default function OrderingCart({ businessId }: { businessId: string }) {
                           pkg?.price != null
                             ? `$${Number(pkg.price).toFixed(2)}`
                             : "-";
+                        const perUnitDisplay = (() => {
+                          if (!pkg || pkg.price == null) return "";
+                          const units = pkg.unitsPerCase;
+                          if (!units || units <= 0) return "";
+                          const unitLabel = (pkg.unitSingular || "unit").trim();
+                          const per = Number(pkg.price) / units;
+                          return `$${per.toFixed(2)} per ${unitLabel}`;
+                        })();
                         return (
                           <div
                             key={p.id}
@@ -439,8 +466,15 @@ export default function OrderingCart({ businessId }: { businessId: string }) {
                                 )}
                               </select>
                             </div>
-                            <div className="col-span-2 text-sm text-[var(--oe-black)]">
-                              {priceDisplay}
+                            <div className="col-span-2">
+                              <div className="text-sm font-medium text-[var(--oe-black)]">
+                                {priceDisplay}
+                              </div>
+                              {perUnitDisplay && (
+                                <div className="text-[11px] text-gray-500 mt-0.5">
+                                  {perUnitDisplay}
+                                </div>
+                              )}
                             </div>
                             <div className="col-span-1 text-sm text-gray-500">
                               -
